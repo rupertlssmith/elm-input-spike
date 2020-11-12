@@ -1,7 +1,7 @@
 {
-  "name": "elm-scroll-spike",
+  "name": "elm-input-spike",
   "version": "0.0.1",
-  "description": "Text editing buffers in Elm.",
+  "description": "Text editing input in Elm.",
   "scripts": {
     "start": "webpack-dev-server --hot",
     "prebuild": "rimraf dist",

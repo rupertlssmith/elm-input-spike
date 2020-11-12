@@ -1,3 +1,3 @@
-# elm-buffer-spike
+# elm-input-spike
 
-Implementing a text editing buffer in Elm.
+Figuring out what input method works best for text editing in Elm.
