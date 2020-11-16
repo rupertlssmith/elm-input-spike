@@ -53,7 +53,7 @@ config =
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
     , lineLength = 120
-    , numLines = 10000
+    , numLines = 10
     , blinkInterval = 400
     }
 
@@ -90,14 +90,27 @@ type alias RowCol =
 
 
 init _ =
-    ( { editor = initEditor initialEditorState
-      , buffer = TextBuffer.empty initialCtx tagLineFn
-      , top = 0
-      , height = 0
+    let
+        buffer =
+            TextBuffer.empty initialCtx tagLineFn
+
+        top =
+            0
+
+        height =
+            0
+
+        linesPP =
+            0
+    in
+    ( { editor = initEditor (initialEditorState linesPP top height buffer)
+      , buffer = buffer
+      , top = top
+      , height = height
       , cursor = { row = 0, col = 0 }
       , scrollRow = 0
       , targetCol = 0
-      , linesPerPage = 0
+      , linesPerPage = linesPP
       , bottomOffset = 0.0
       , blinker = False
       , lastActive = Time.millisToPosix 0
@@ -179,9 +192,9 @@ tagLineFn charBuffer startCtx =
 -- RTE Editor Setup
 
 
-initialEditorState : State
-initialEditorState =
-    RTMSt.state initialRootNode Nothing
+initialEditorState : Int -> Float -> Float -> TextBuffer Tag Tag -> State
+initialEditorState lines top height buffer =
+    RTMSt.state (initialRootNode lines top height buffer) Nothing
 
 
 editorConfig : RTE.Config Msg
@@ -212,23 +225,62 @@ initEditor iState =
     RTE.init iState
 
 
-initialRootNode : Block
-initialRootNode =
+initialRootNode : Int -> Float -> Float -> TextBuffer Tag Tag -> Block
+initialRootNode lines top height buffer =
     RTMN.block
         (RTME.element codeRoot [])
-        (RTMN.blockChildren (Array.fromList [ initialEditorNode ]))
+        (RTMN.blockChildren (Array.fromList [ initialEditorNode lines top height buffer ]))
 
 
-initialEditorNode : Block
-initialEditorNode =
+initialEditorNode : Int -> Float -> Float -> TextBuffer Tag Tag -> Block
+initialEditorNode lines top height buffer =
+    let
+        pad =
+            -- Ensure there is always 1 full page above and below for page up and down.
+            lines + 1
+
+        startLine =
+            max 0
+                ((top / config.lineHeight |> floor) - pad)
+
+        endLine =
+            ((top + height) / config.lineHeight |> floor) + pad
+
+        adjHeight =
+            (TextBuffer.length buffer |> toFloat) * config.lineHeight
+
+        vl row line =
+            let
+                content =
+                    List.map
+                        (\( tag, str ) ->
+                            case tag of
+                                NormalText ->
+                                    RTMN.markedText str [ RTMM.mark (tagMark NormalText) [] ]
+
+                                QuotedText ->
+                                    RTMN.markedText str [ RTMM.mark (tagMark QuotedText) [] ]
+                        )
+                        line.tagged
+            in
+            content
+    in
     RTMN.block
         (RTME.element codeLine [])
         (RTMN.inlineChildren
-            (Array.fromList
-                [ RTMN.plainText "This is a "
-                , RTMN.markedText "\"line\"" [ RTMM.mark (tagMark QuotedText) [] ]
-                , RTMN.plainText " of code"
-                ]
+            (List.range startLine endLine
+                |> List.foldr
+                    (\idx accum ->
+                        case TextBuffer.getLine idx buffer of
+                            Nothing ->
+                                accum
+
+                            Just row ->
+                                vl idx row :: accum
+                    )
+                    []
+                |> List.concat
+                |> Array.fromList
             )
         )
 
