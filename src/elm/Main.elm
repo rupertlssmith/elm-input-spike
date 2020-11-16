@@ -1,7 +1,5 @@
 module Main exposing (main)
 
---import GapBuffer exposing (Buffer)
-
 import Array exposing (Array)
 import Browser exposing (Document)
 import Browser.Dom exposing (Viewport)
@@ -25,7 +23,7 @@ import RichText.Config.Command as RTCC exposing (CommandMap)
 import RichText.Config.Decorations as RTCD exposing (Decorations)
 import RichText.Config.ElementDefinition as RTCED exposing (ElementDefinition, ElementToHtml, HtmlToElement)
 import RichText.Config.Keys as RTCK
-import RichText.Config.MarkDefinition as RTMD exposing (HtmlToMark, MarkDefinition, MarkToHtml)
+import RichText.Config.MarkDefinition as RTCMD exposing (HtmlToMark, MarkDefinition, MarkToHtml)
 import RichText.Config.Spec as RTCS exposing (Spec)
 import RichText.Definitions as RTD
 import RichText.Editor as RTE exposing (Config, Editor, Message)
@@ -204,16 +202,9 @@ editorSpec =
             , codeLine
             ]
         |> RTCS.withMarkDefinitions
-            -- [ tagMark Keyword
-            -- , tagMark Name
-            -- , tagMark FieldName
-            -- , tagMark PropName
-            -- , tagMark ConstructorName
-            -- , tagMark StringLit
-            -- , tagMark IntLit
-            -- , tagMark Const
-            -- ]
-            []
+            [ tagMark NormalText
+            , tagMark QuotedText
+            ]
 
 
 initEditor : State -> Editor
@@ -235,8 +226,7 @@ initialEditorNode =
         (RTMN.inlineChildren
             (Array.fromList
                 [ RTMN.plainText "This is a "
-
-                --, RTMN.markedText "line" [ mark (tagMark Keyword) [] ]
+                , RTMN.markedText "\"line\"" [ RTMM.mark (tagMark QuotedText) [] ]
                 , RTMN.plainText " of code"
                 ]
             )
@@ -788,6 +778,29 @@ htmlNodeToCodeLine def node =
 
 
 
+-- Tag Rendering
+
+
+tagMark : Tag -> MarkDefinition
+tagMark tag =
+    RTCMD.markDefinition
+        { name = "tag_" ++ Enum.toString tagEnum tag
+        , toHtmlNode = tagToHtmlNode tag
+        , fromHtmlNode = htmlNodeToTag
+        }
+
+
+tagToHtmlNode : Tag -> MarkToHtml
+tagToHtmlNode tag _ children =
+    ElementNode "span" [ ( "class", Enum.toString tagEnum tag ) ] children
+
+
+htmlNodeToTag : HtmlToMark
+htmlNodeToTag =
+    RTCMD.defaultHtmlToMark "span"
+
+
+
 -- View
 
 
@@ -796,6 +809,7 @@ view model =
     { title = "Input Spike"
     , body =
         [ Css.Global.global global |> Html.Styled.toUnstyled
+        , RTE.view editorConfig model.editor
         , editorView model
         ]
     }
