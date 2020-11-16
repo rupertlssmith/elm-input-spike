@@ -8,6 +8,7 @@ import Browser.Dom exposing (Viewport)
 import Browser.Events
 import Css
 import Css.Global
+import Enum exposing (Enum)
 import GapBuffer
 import Html as H exposing (Attribute, Html)
 import Html.Attributes as HA
@@ -19,6 +20,24 @@ import Json.Decode as Decode exposing (Decoder)
 import Random exposing (Generator, Seed)
 import Random.Array
 import Regex exposing (Regex)
+import RichText.Commands as RTC
+import RichText.Config.Command as RTCC exposing (CommandMap)
+import RichText.Config.Decorations as RTCD exposing (Decorations)
+import RichText.Config.ElementDefinition as RTCED exposing (ElementDefinition, ElementToHtml, HtmlToElement)
+import RichText.Config.Keys as RTCK
+import RichText.Config.MarkDefinition as RTMD exposing (HtmlToMark, MarkDefinition, MarkToHtml)
+import RichText.Config.Spec as RTCS exposing (Spec)
+import RichText.Definitions as RTD
+import RichText.Editor as RTE exposing (Config, Editor, Message)
+import RichText.List as RTL exposing (ListType)
+import RichText.Model.Attribute as RTMA exposing (Attribute(..))
+import RichText.Model.Element as RTME
+import RichText.Model.HtmlNode as RTMHN exposing (HtmlNode(..))
+import RichText.Model.Mark as RTMM exposing (ToggleAction(..))
+import RichText.Model.Node as RTMN exposing (Block, Children(..), Inline(..), Path)
+import RichText.Model.Selection as RTMSel
+import RichText.Model.State as RTMSt exposing (State)
+import RichText.Node as RTN exposing (Node(..))
 import Task exposing (Task)
 import TextBuffer exposing (TextBuffer)
 import Time exposing (Posix)
@@ -52,7 +71,8 @@ main =
 
 
 type alias Model =
-    { buffer : TextBuffer Tag Tag
+    { editor : Editor
+    , buffer : TextBuffer Tag Tag
     , top : Float
     , height : Float
     , cursor : RowCol
@@ -72,7 +92,8 @@ type alias RowCol =
 
 
 init _ =
-    ( { buffer = TextBuffer.empty initialCtx tagLineFn
+    ( { editor = initEditor initialEditorState
+      , buffer = TextBuffer.empty initialCtx tagLineFn
       , top = 0
       , height = 0
       , cursor = { row = 0, col = 0 }
@@ -92,12 +113,37 @@ init _ =
 
 
 
--- Buffer setup.
+-- Syntax markup
 
 
 type Tag
     = NormalText
     | QuotedText
+
+
+tags : List Tag
+tags =
+    [ NormalText
+    , QuotedText
+    ]
+
+
+tagEnum : Enum Tag
+tagEnum =
+    Enum.define
+        tags
+        (\tag ->
+            case tag of
+                NormalText ->
+                    "normal"
+
+                QuotedText ->
+                    "quoted"
+        )
+
+
+
+-- Buffer setup.
 
 
 initialCtx : Tag
@@ -132,6 +178,77 @@ tagLineFn charBuffer startCtx =
 
 
 
+-- RTE Editor Setup
+
+
+initialEditorState : State
+initialEditorState =
+    RTMSt.state initialRootNode Nothing
+
+
+editorConfig : RTE.Config Msg
+editorConfig =
+    RTE.config
+        { decorations = RTCD.emptyDecorations
+        , commandMap = commandBindings editorSpec
+        , spec = editorSpec
+        , toMsg = RTEMsg
+        }
+
+
+editorSpec : Spec
+editorSpec =
+    RTCS.emptySpec
+        |> RTCS.withElementDefinitions
+            [ codeRoot
+            , codeLine
+            ]
+        |> RTCS.withMarkDefinitions
+            -- [ tagMark Keyword
+            -- , tagMark Name
+            -- , tagMark FieldName
+            -- , tagMark PropName
+            -- , tagMark ConstructorName
+            -- , tagMark StringLit
+            -- , tagMark IntLit
+            -- , tagMark Const
+            -- ]
+            []
+
+
+initEditor : State -> Editor
+initEditor iState =
+    RTE.init iState
+
+
+initialRootNode : Block
+initialRootNode =
+    RTMN.block
+        (RTME.element codeRoot [])
+        (RTMN.blockChildren (Array.fromList [ initialEditorNode ]))
+
+
+initialEditorNode : Block
+initialEditorNode =
+    RTMN.block
+        (RTME.element codeLine [])
+        (RTMN.inlineChildren
+            (Array.fromList
+                [ RTMN.plainText "This is a "
+
+                --, RTMN.markedText "line" [ mark (tagMark Keyword) [] ]
+                , RTMN.plainText " of code"
+                ]
+            )
+        )
+
+
+commandBindings : Spec -> CommandMap
+commandBindings spec =
+    RTC.defaultCommandMap
+
+
+
 -- Events and event handling.
 
 
@@ -143,7 +260,8 @@ subscriptions _ =
 
 
 type Msg
-    = Scroll ScrollEvent
+    = RTEMsg Message
+    | Scroll ScrollEvent
     | RandomBuffer (TextBuffer Tag Tag)
     | ContentViewPort (Result Browser.Dom.Error Viewport)
     | Resize
@@ -169,6 +287,9 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        RTEMsg rteMsg ->
+            ( { model | editor = RTE.update editorConfig rteMsg model.editor }, Cmd.none )
+
         RandomBuffer buffer ->
             ( { model | buffer = buffer }, Cmd.none )
 
@@ -582,6 +703,88 @@ global =
         , Css.borderLeft3 (Css.px 2.5) Css.solid (Css.rgb 90 95 167)
         ]
     ]
+
+
+
+-- Code line editors
+
+
+codeRoot : ElementDefinition
+codeRoot =
+    RTCED.elementDefinition
+        { name = "code_root"
+        , group = "root"
+        , contentType = RTCED.blockNode [ "block" ]
+        , toHtmlNode = codeRootToHtml
+        , fromHtmlNode = htmlToCodeRoot
+        , selectable = False
+        }
+
+
+codeRootToHtml : ElementToHtml
+codeRootToHtml _ children =
+    ElementNode "pre"
+        [ ( "data-code-root", "true" ) ]
+        children
+
+
+htmlToCodeRoot : HtmlToElement
+htmlToCodeRoot definition node =
+    case node of
+        ElementNode name attrs children ->
+            if name == "pre" && attrs == [ ( "data-code-root", "true" ) ] then
+                Just <| ( RTME.element definition [], children )
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+codeLine : ElementDefinition
+codeLine =
+    RTCED.elementDefinition
+        { name = "code_line"
+        , group = "block"
+        , contentType =
+            RTCED.textBlock
+                { allowedGroups = [ "text" ]
+                , allowedMarks = []
+                }
+        , toHtmlNode = codeLineToHtmlNode
+        , fromHtmlNode = htmlNodeToCodeLine
+        , selectable = False
+        }
+
+
+codeLineToHtmlNode : ElementToHtml
+codeLineToHtmlNode _ children =
+    ElementNode "div" [ ( "class", "code-line" ) ] children
+
+
+htmlNodeToCodeLine : HtmlToElement
+htmlNodeToCodeLine def node =
+    case node of
+        ElementNode name _ children ->
+            if name == "pre" && Array.length children == 1 then
+                case Array.get 0 children of
+                    Nothing ->
+                        Nothing
+
+                    Just n ->
+                        case n of
+                            ElementNode _ _ childChildren ->
+                                Just ( RTME.element def [], childChildren )
+
+                            _ ->
+                                Nothing
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
 
 
 
