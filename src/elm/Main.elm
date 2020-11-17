@@ -52,7 +52,7 @@ config =
     { fontSize = fontSize
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
-    , lineLength = 120
+    , lineLength = 12
     , numLines = 10
     , blinkInterval = 400
     }
@@ -103,7 +103,7 @@ init _ =
         linesPP =
             0
     in
-    ( { editor = initEditor (initialEditorState linesPP top height buffer)
+    ( { editor = RTE.init (initialEditorState linesPP top height buffer)
       , buffer = buffer
       , top = top
       , height = height
@@ -192,11 +192,6 @@ tagLineFn charBuffer startCtx =
 -- RTE Editor Setup
 
 
-initialEditorState : Int -> Float -> Float -> TextBuffer Tag Tag -> State
-initialEditorState lines top height buffer =
-    RTMSt.state (initialRootNode lines top height buffer) Nothing
-
-
 editorConfig : RTE.Config Msg
 editorConfig =
     RTE.config
@@ -220,20 +215,18 @@ editorSpec =
             ]
 
 
-initEditor : State -> Editor
-initEditor iState =
-    RTE.init iState
+commandBindings : Spec -> CommandMap
+commandBindings spec =
+    RTC.defaultCommandMap
 
 
-initialRootNode : Int -> Float -> Float -> TextBuffer Tag Tag -> Block
-initialRootNode lines top height buffer =
-    RTMN.block
-        (RTME.element codeRoot [])
-        (RTMN.blockChildren (Array.fromList [ initialEditorNode lines top height buffer ]))
+initialEditorState : Int -> Float -> Float -> TextBuffer Tag Tag -> State
+initialEditorState lines top height buffer =
+    RTMSt.state (editorContent lines top height buffer) Nothing
 
 
-initialEditorNode : Int -> Float -> Float -> TextBuffer Tag Tag -> Block
-initialEditorNode lines top height buffer =
+editorContent : Int -> Float -> Float -> TextBuffer Tag Tag -> Block
+editorContent lines top height buffer =
     let
         pad =
             -- Ensure there is always 1 full page above and below for page up and down.
@@ -248,46 +241,49 @@ initialEditorNode lines top height buffer =
 
         adjHeight =
             (TextBuffer.length buffer |> toFloat) * config.lineHeight
-
-        vl row line =
-            let
-                content =
-                    List.map
-                        (\( tag, str ) ->
-                            case tag of
-                                NormalText ->
-                                    RTMN.markedText str [ RTMM.mark (tagMark NormalText) [] ]
-
-                                QuotedText ->
-                                    RTMN.markedText str [ RTMM.mark (tagMark QuotedText) [] ]
-                        )
-                        line.tagged
-            in
-            content
     in
     RTMN.block
-        (RTME.element codeLine [])
-        (RTMN.inlineChildren
-            (List.range startLine endLine
-                |> List.foldr
-                    (\idx accum ->
-                        case TextBuffer.getLine idx buffer of
-                            Nothing ->
-                                accum
-
-                            Just row ->
-                                vl idx row :: accum
-                    )
-                    []
-                |> List.concat
-                |> Array.fromList
-            )
+        (RTME.element codeRoot
+            [ RTMA.StringAttribute "style" ("height: " ++ (String.fromFloat adjHeight ++ "px"))
+            ]
         )
+        (RTMN.blockChildren (editorLines startLine endLine buffer))
 
 
-commandBindings : Spec -> CommandMap
-commandBindings spec =
-    RTC.defaultCommandMap
+editorLines : Int -> Int -> TextBuffer Tag Tag -> Array Block
+editorLines start end buffer =
+    List.range start end
+        |> List.foldr
+            (\idx accum ->
+                case TextBuffer.getLine idx buffer of
+                    Nothing ->
+                        accum
+
+                    Just line ->
+                        Array.push (editorLine idx line) accum
+            )
+            Array.empty
+
+
+editorLine : Int -> TextBuffer.Line Tag Tag -> Block
+editorLine row line =
+    List.map
+        (\( tag, str ) ->
+            case tag of
+                NormalText ->
+                    RTMN.markedText str [ RTMM.mark (tagMark NormalText) [] ]
+
+                QuotedText ->
+                    RTMN.markedText str [ RTMM.mark (tagMark QuotedText) [] ]
+        )
+        line.tagged
+        |> Array.fromList
+        |> RTMN.inlineChildren
+        |> RTMN.block
+            (RTME.element codeLine
+                [ RTMA.StringAttribute "style" ("top: " ++ (String.fromFloat (toFloat row * config.lineHeight) ++ "px"))
+                ]
+            )
 
 
 
@@ -333,7 +329,12 @@ update msg model =
             ( { model | editor = RTE.update editorConfig rteMsg model.editor }, Cmd.none )
 
         RandomBuffer buffer ->
-            ( { model | buffer = buffer }, Cmd.none )
+            ( { model
+                | buffer = buffer
+                , editor = RTE.init (initialEditorState model.linesPerPage model.top model.height buffer)
+              }
+            , Cmd.none
+            )
 
         Scroll scroll ->
             ( { model
@@ -710,8 +711,8 @@ global =
     , Css.Global.body
         [ Css.pct 100 |> Css.height ]
     , Css.Global.id "editor-main"
-        [ Css.position Css.relative
-        , Css.fontFamily Css.monospace
+        [ -- Css.position Css.relative
+          Css.fontFamily Css.monospace
         , Css.whiteSpace Css.pre
         , Css.overflowX Css.hidden
         , Css.overflowY Css.scroll
@@ -724,15 +725,15 @@ global =
         , Css.outline Css.none
         ]
     , Css.Global.id "content-main"
-        [ Css.position Css.relative
-        , Css.property "flex" "1"
+        [ -- Css.position Css.relative
+          Css.property "flex" "1"
         , Css.property "user-select" "none"
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         ]
     , Css.Global.class "content-line"
-        [ Css.position Css.absolute
-        , Css.px 0 |> Css.left
+        [ -- Css.position Css.absolute
+          Css.px 0 |> Css.left
         , Css.px 0 |> Css.right
         , Css.px config.lineHeight |> Css.lineHeight
         ]
@@ -764,9 +765,18 @@ codeRoot =
 
 
 codeRootToHtml : ElementToHtml
-codeRootToHtml _ children =
+codeRootToHtml element children =
+    let
+        style =
+            RTMA.findStringAttribute "style" (RTME.attributes element)
+                |> Maybe.withDefault ""
+    in
     ElementNode "pre"
-        [ ( "data-code-root", "true" ) ]
+        [ ( "id", "content-main" )
+        , ( "data-code-root", "true" )
+
+        --, ( "style", style )
+        ]
         children
 
 
@@ -801,8 +811,18 @@ codeLine =
 
 
 codeLineToHtmlNode : ElementToHtml
-codeLineToHtmlNode _ children =
-    ElementNode "div" [ ( "class", "code-line" ) ] children
+codeLineToHtmlNode element children =
+    let
+        style =
+            RTMA.findStringAttribute "style" (RTME.attributes element)
+                |> Maybe.withDefault ""
+    in
+    ElementNode "div"
+        [ ( "class", "content-line" )
+
+        --, ( "style", style )
+        ]
+        children
 
 
 htmlNodeToCodeLine : HtmlToElement
@@ -861,26 +881,43 @@ view model =
     { title = "Input Spike"
     , body =
         [ Css.Global.global global |> Html.Styled.toUnstyled
-        , RTE.view editorConfig model.editor
-        , editorView model
+        , rteView model
         ]
     }
 
 
-editorView : Model -> Html Msg
-editorView model =
+rteView : Model -> Html Msg
+rteView model =
     H.div
         [ HA.id "editor-main"
         , HE.on "scroll" scrollDecoder
-        , HE.preventDefaultOn "keydown" keyDecoder
+
+        --, HE.preventDefaultOn "keydown" keyDecoder
         ]
         [ H.div
             [ HA.id "editor-main-inner"
             , HA.tabindex 0
             ]
-            [ viewContent model
+            [ RTE.view editorConfig model.editor
             ]
         ]
+
+
+
+-- editorView : Model -> Html Msg
+-- editorView model =
+--     H.div
+--         [ HA.id "editor-main"
+--         , HE.on "scroll" scrollDecoder
+--         , HE.preventDefaultOn "keydown" keyDecoder
+--         ]
+--         [ H.div
+--             [ HA.id "editor-main-inner"
+--             , HA.tabindex 0
+--             ]
+--             [ viewContent model
+--             ]
+--         ]
 
 
 viewCursors : Model -> Html Msg
@@ -915,96 +952,96 @@ viewCursor model =
         [ H.text "" ]
 
 
-viewContent : Model -> Html Msg
-viewContent model =
-    let
-        pad =
-            -- Ensure there is always 1 full page above and below for page up and down.
-            model.linesPerPage + 1
 
-        startLine =
-            max 0
-                ((model.top / config.lineHeight |> floor) - pad)
-
-        endLine =
-            ((model.top + model.height) / config.lineHeight |> floor) + pad
-
-        height =
-            (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
-    in
-    H.div
-        [ HA.id "content-main"
-        , HA.style "height" (String.fromFloat height ++ "px")
-        ]
-        [ viewCursors model
-
-        --, keyedViewLines startLine endLine model.buffer
-        , viewLines startLine endLine model.buffer
-        ]
-
-
-viewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
-viewLines start end buffer =
-    List.range start end
-        |> List.foldr
-            (\idx accum ->
-                case TextBuffer.getLine idx buffer of
-                    Nothing ->
-                        accum
-
-                    Just row ->
-                        viewLine idx row :: accum
-            )
-            []
-        |> H.div []
-
-
-keyedViewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
-keyedViewLines start end buffer =
-    List.range start end
-        |> List.foldr
-            (\idx accum ->
-                case TextBuffer.getLine idx buffer of
-                    Nothing ->
-                        accum
-
-                    Just row ->
-                        viewKeyedLine idx row :: accum
-            )
-            []
-        |> Keyed.node "div" []
-
-
-viewKeyedLine : Int -> TextBuffer.Line Tag Tag -> ( String, Html Msg )
-viewKeyedLine row content =
-    ( String.fromInt row
-    , Html.Lazy.lazy2 viewLine row content
-    )
-
-
-viewLine : Int -> TextBuffer.Line Tag Tag -> Html Msg
-viewLine row line =
-    let
-        content =
-            List.map
-                (\( tag, str ) ->
-                    case tag of
-                        NormalText ->
-                            H.span [ HA.style "color" "black" ] [ H.text str ]
-
-                        QuotedText ->
-                            H.span [ HA.style "color" "green" ] [ H.text str ]
-                )
-                line.tagged
-    in
-    H.div
-        [ HA.class "content-line"
-        , HA.style "top" (String.fromFloat (toFloat row * config.lineHeight) ++ "px")
-        ]
-        content
-
-
-
+-- viewContent : Model -> Html Msg
+-- viewContent model =
+--     let
+--         pad =
+--             -- Ensure there is always 1 full page above and below for page up and down.
+--             model.linesPerPage + 1
+--
+--         startLine =
+--             max 0
+--                 ((model.top / config.lineHeight |> floor) - pad)
+--
+--         endLine =
+--             ((model.top + model.height) / config.lineHeight |> floor) + pad
+--
+--         height =
+--             (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
+--     in
+--     H.div
+--         [ HA.id "content-main"
+--         , HA.style "height" (String.fromFloat height ++ "px")
+--         ]
+--         [ viewCursors model
+--
+--         --, keyedViewLines startLine endLine model.buffer
+--         , viewLines startLine endLine model.buffer
+--         ]
+--
+--
+-- viewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
+-- viewLines start end buffer =
+--     List.range start end
+--         |> List.foldr
+--             (\idx accum ->
+--                 case TextBuffer.getLine idx buffer of
+--                     Nothing ->
+--                         accum
+--
+--                     Just row ->
+--                         viewLine idx row :: accum
+--             )
+--             []
+--         |> H.div []
+--
+--
+-- keyedViewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
+-- keyedViewLines start end buffer =
+--     List.range start end
+--         |> List.foldr
+--             (\idx accum ->
+--                 case TextBuffer.getLine idx buffer of
+--                     Nothing ->
+--                         accum
+--
+--                     Just row ->
+--                         viewKeyedLine idx row :: accum
+--             )
+--             []
+--         |> Keyed.node "div" []
+--
+--
+-- viewKeyedLine : Int -> TextBuffer.Line Tag Tag -> ( String, Html Msg )
+-- viewKeyedLine row content =
+--     ( String.fromInt row
+--     , Html.Lazy.lazy2 viewLine row content
+--     )
+--
+--
+-- viewLine : Int -> TextBuffer.Line Tag Tag -> Html Msg
+-- viewLine row line =
+--     let
+--         content =
+--             List.map
+--                 (\( tag, str ) ->
+--                     case tag of
+--                         NormalText ->
+--                             H.span [ HA.style "color" "black" ] [ H.text str ]
+--
+--                         QuotedText ->
+--                             H.span [ HA.style "color" "green" ] [ H.text str ]
+--                 )
+--                 line.tagged
+--     in
+--     H.div
+--         [ HA.class "content-line"
+--         , HA.style "top" (String.fromFloat (toFloat row * config.lineHeight) ++ "px")
+--         ]
+--         content
+--
+--
 -- Scroll events
 
 
