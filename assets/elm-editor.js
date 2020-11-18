@@ -327,12 +327,30 @@ class ElmEditor extends HTMLElement {
         this.addEventListener("compositionstart", this.compositionStart.bind(this));
         this.addEventListener("compositionend", this.compositionEnd.bind(this));
         // this.addEventListener("click", this.caretCallback.bind(this));
-        this.addEventListener("keyup", this.caretCallback.bind(this));
-        this.addEventListener("keydown", this.caretCallback.bind(this));
+        // this.addEventListener("keyup", this.caretCallback.bind(this));
+        // this.addEventListener("keydown", this.caretCallback.bind(this));
         this.dispatchInit = this.dispatchInit.bind(this);
+        this.repeatOften(this);
 
         console.log("constructor completed");
 
+    }
+
+    repeatOften(t) {
+       requestAnimationFrame(function() {
+         const index = getCaretIndex(t);
+         const coord = getCaretCoordinates();
+         const newEvent = new CustomEvent("caretposition", {
+             detail: {
+                 index: index,
+                 x: coord.x,
+                 y: coord.y
+             }
+         });
+         t.dispatchEvent(newEvent);
+
+         t.repeatOften(t);
+       });
     }
 
     connectedCallback() {
