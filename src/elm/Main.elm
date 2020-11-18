@@ -764,55 +764,47 @@ keyDecoder =
 
 keyToMsg : KeyEvent -> Decoder ( Msg, Bool )
 keyToMsg keyEvent =
-    case String.uncons keyEvent.key of
-        Just ( char, "" ) ->
-            Decode.succeed ( InsertChar char, True )
+    case keyEvent.key of
+        -- "ArrowUp" ->
+        --     Decode.succeed ( MoveUp, True )
+        --
+        -- "ArrowDown" ->
+        --     Decode.succeed ( MoveDown, True )
+        --
+        -- "ArrowLeft" ->
+        --     Decode.succeed ( MoveLeft, True )
+        --
+        -- "ArrowRight" ->
+        --     Decode.succeed ( MoveRight, True )
+        "PageUp" ->
+            Decode.succeed ( PageUp, True )
+
+        "PageDown" ->
+            Decode.succeed ( PageDown, True )
+
+        -- "Backspace" ->
+        --     Decode.succeed ( RemoveCharBefore, True )
+        --
+        -- "Delete" ->
+        --     Decode.succeed ( RemoveCharAfter, True )
+        -- "Enter" ->
+        --     Decode.succeed ( NewLine, True )
+        "Home" ->
+            if keyEvent.ctrlKey then
+                Decode.succeed ( FileHome, True )
+
+            else
+                Decode.succeed ( LineHome, True )
+
+        "End" ->
+            if keyEvent.ctrlKey then
+                Decode.succeed ( FileEnd, True )
+
+            else
+                Decode.succeed ( LineEnd, True )
 
         _ ->
-            case keyEvent.key of
-                "ArrowUp" ->
-                    Decode.succeed ( MoveUp, True )
-
-                "ArrowDown" ->
-                    Decode.succeed ( MoveDown, True )
-
-                "ArrowLeft" ->
-                    Decode.succeed ( MoveLeft, True )
-
-                "ArrowRight" ->
-                    Decode.succeed ( MoveRight, True )
-
-                "PageUp" ->
-                    Decode.succeed ( PageUp, True )
-
-                "PageDown" ->
-                    Decode.succeed ( PageDown, True )
-
-                "Backspace" ->
-                    Decode.succeed ( RemoveCharBefore, True )
-
-                "Delete" ->
-                    Decode.succeed ( RemoveCharAfter, True )
-
-                "Enter" ->
-                    Decode.succeed ( NewLine, True )
-
-                "Home" ->
-                    if keyEvent.ctrlKey then
-                        Decode.succeed ( FileHome, True )
-
-                    else
-                        Decode.succeed ( LineHome, True )
-
-                "End" ->
-                    if keyEvent.ctrlKey then
-                        Decode.succeed ( FileEnd, True )
-
-                    else
-                        Decode.succeed ( LineEnd, True )
-
-                _ ->
-                    Decode.fail "This key does nothing"
+            Decode.fail "This key does nothing"
 
 
 
