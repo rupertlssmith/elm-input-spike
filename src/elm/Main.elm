@@ -148,6 +148,7 @@ type Msg
     | InputMsg InputEvent
     | PasteMsg PasteEvent
     | Scroll ScrollEvent
+    | CaretMsg CaretPosition
     | RandomBuffer (TextBuffer Tag Tag)
     | ContentViewPort (Result Browser.Dom.Error Viewport)
     | Resize
@@ -201,8 +202,14 @@ update msg model =
             in
             ( model, Cmd.none )
 
-        RandomBuffer buffer ->
-            ( { model | buffer = buffer }, Cmd.none )
+        CaretMsg val ->
+            let
+                _ =
+                    Debug.log "CaretMsg" val
+            in
+            ( model, Cmd.none )
+                |> andThen (moveTo { row = 0, col = val.index })
+                |> andThen activity
 
         Scroll scroll ->
             ( { model
@@ -211,6 +218,9 @@ update msg model =
               }
             , Cmd.none
             )
+
+        RandomBuffer buffer ->
+            ( { model | buffer = buffer }, Cmd.none )
 
         ContentViewPort result ->
             case result of
@@ -599,6 +609,7 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
+        , Css.property "caret-color" "transparent"
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
@@ -647,6 +658,7 @@ editorView model =
                 , HE.on "editorchange" editorChangeDecoder
                 , HE.on "beforeinput" beforeInputDecoder
                 , HE.on "pastewithdata" pasteWithDataDecoder
+                , HE.on "caretposition" caretPositionDecoder
                 ]
                 [ viewContent model
                 , H.node "selection-state" [] []
@@ -976,6 +988,26 @@ pasteWithDataDecoder =
         |> andMap (Decode.at [ "detail", "text" ] Decode.string)
         |> andMap (Decode.at [ "detail", "html" ] Decode.string)
         |> Decode.map PasteMsg
+
+
+
+-- Caret events
+
+
+type alias CaretPosition =
+    { index : Int
+    , x : Float
+    , y : Float
+    }
+
+
+caretPositionDecoder : Decoder Msg
+caretPositionDecoder =
+    Decode.succeed CaretPosition
+        |> andMap (Decode.at [ "detail", "index" ] Decode.int)
+        |> andMap (Decode.at [ "detail", "x" ] Decode.float)
+        |> andMap (Decode.at [ "detail", "y" ] Decode.float)
+        |> Decode.map CaretMsg
 
 
 

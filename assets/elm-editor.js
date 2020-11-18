@@ -1,3 +1,6 @@
+// Move caret on animation frame CodePen
+// https://codepen.io/shawnlukas/pen/GRJZMOW
+
 const zeroWidthSpace = "\u200B";
 
 const isAndroid = () => { return /(android)/i.test(navigator.userAgent); };
@@ -134,6 +137,52 @@ let adjustOffset = (node, offset) => {
 
     return offset;
 };
+
+function getCaretCoordinates() {
+  let x = 0,
+    y = 0;
+  const isSupported = typeof window.getSelection !== "undefined";
+  if (isSupported) {
+    const selection = window.getSelection();
+    // Check if there is a selection (i.e. cursor in place)
+    if (selection.rangeCount !== 0) {
+      // Clone the range
+      const range = selection.getRangeAt(0).cloneRange();
+      // Collapse the range to the start, so there are not multiple chars selected
+      range.collapse(true);
+      // getCientRects returns all the positioning information we need
+      const rect = range.getClientRects()[0];
+      if (rect) {
+        x = rect.left; // since the caret is only 1px wide, left == right
+        y = rect.top; // top edge of the caret
+      }
+    }
+  }
+  return { x, y };
+}
+
+function getCaretIndex(element) {
+  let position = 0;
+  const isSupported = typeof window.getSelection !== "undefined";
+  if (isSupported) {
+    const selection = window.getSelection();
+    // Check if there is a selection (i.e. cursor in place)
+    if (selection.rangeCount !== 0) {
+      // Store the original range
+      const range = window.getSelection().getRangeAt(0);
+      // Clone the range
+      const preCaretRange = range.cloneRange();
+      // Select all textual contents from the contenteditable element
+      preCaretRange.selectNodeContents(element);
+      // And set the range end to the original clicked position
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      // Return the text length from contenteditable start to the range end
+      position = preCaretRange.toString().length;
+    }
+  }
+  return position;
+}
+
 
 /**
  * SelectionState is a webcomponent that syncs the editor's selection state with the selection
@@ -277,11 +326,9 @@ class ElmEditor extends HTMLElement {
         this.addEventListener("paste", this.pasteCallback);
         this.addEventListener("compositionstart", this.compositionStart.bind(this));
         this.addEventListener("compositionend", this.compositionEnd.bind(this));
-        // const editable = document.getElementById("contenteditable");
-        // document.addEventListener("click", (e) => toggleTooltip(e, editable));
-        // document.addEventListener("click", (e) => updateIndex(e, editable));
-        // document.addEventListener("keyup", (e) => toggleTooltip(e, editable));
-        this.addEventListener("keyup", this.updateIndex.bind(this));
+        // this.addEventListener("click", this.caretCallback.bind(this));
+        this.addEventListener("keyup", this.caretCallback.bind(this));
+        this.addEventListener("keydown", this.caretCallback.bind(this));
         this.dispatchInit = this.dispatchInit.bind(this);
 
         console.log("constructor completed");
@@ -316,16 +363,22 @@ class ElmEditor extends HTMLElement {
                 html: html
             }
         });
-        this.dispatchEvent(newEvent)
+        this.dispatchEvent(newEvent);
     }
 
-    updateIndex(e) {
-      console.log("updateIndex called");
-
-      if (this.contains(event.target)) {
-        console.log(getCaretIndex(this).toString());
-        console.log(getCaretCoordinates());
-      }
+    caretCallback(e) {
+        if (this.contains(event.target)) {
+            const index = getCaretIndex(this);
+            const coord = getCaretCoordinates();
+            const newEvent = new CustomEvent("caretposition", {
+                detail: {
+                    index: index,
+                    x: coord.x,
+                    y: coord.y
+                }
+            });
+            this.dispatchEvent(newEvent);
+         }
     }
 
     /**
@@ -384,50 +437,3 @@ class ElmEditor extends HTMLElement {
 
 customElements.define('elm-editor', ElmEditor);
 customElements.define('selection-state', SelectionState);
-
-
-
-function getCaretCoordinates() {
-  let x = 0,
-    y = 0;
-  const isSupported = typeof window.getSelection !== "undefined";
-  if (isSupported) {
-    const selection = window.getSelection();
-    // Check if there is a selection (i.e. cursor in place)
-    if (selection.rangeCount !== 0) {
-      // Clone the range
-      const range = selection.getRangeAt(0).cloneRange();
-      // Collapse the range to the start, so there are not multiple chars selected
-      range.collapse(true);
-      // getCientRects returns all the positioning information we need
-      const rect = range.getClientRects()[0];
-      if (rect) {
-        x = rect.left; // since the caret is only 1px wide, left == right
-        y = rect.top; // top edge of the caret
-      }
-    }
-  }
-  return { x, y };
-}
-
-function getCaretIndex(element) {
-  let position = 0;
-  const isSupported = typeof window.getSelection !== "undefined";
-  if (isSupported) {
-    const selection = window.getSelection();
-    // Check if there is a selection (i.e. cursor in place)
-    if (selection.rangeCount !== 0) {
-      // Store the original range
-      const range = window.getSelection().getRangeAt(0);
-      // Clone the range
-      const preCaretRange = range.cloneRange();
-      // Select all textual contents from the contenteditable element
-      preCaretRange.selectNodeContents(element);
-      // And set the range end to the original clicked position
-      preCaretRange.setEnd(range.endContainer, range.endOffset);
-      // Return the text length from contenteditable start to the range end
-      position = preCaretRange.toString().length;
-    }
-  }
-  return position;
-}
