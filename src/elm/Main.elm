@@ -749,6 +749,12 @@ type alias InitEvent =
     }
 
 
+initDecoder : Decoder InitEvent
+initDecoder =
+    Decode.succeed InitEvent
+        |> andMap (Decode.at [ "detail", "shortKey" ] Decode.string)
+
+
 
 -- Editor mutation events.
 
@@ -780,6 +786,46 @@ type alias TextChange =
 
 type alias Path =
     List Int
+
+
+editorChangeDecoder : Decode.Decoder EditorChange
+editorChangeDecoder =
+    Decode.succeed EditorChange
+        |> andMap (Decode.at [ "detail", "root" ] Decode.value)
+        |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
+        |> andMap (Decode.maybe (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder))
+        |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
+        |> andMap (Decode.at [ "detail", "isComposing" ] (Decode.oneOf [ Decode.bool, Decode.succeed False ]))
+
+
+characterDataMutationsDecoder : Decode.Decoder (List TextChange)
+characterDataMutationsDecoder =
+    Decode.list
+        (Decode.map2 Tuple.pair
+            (Decode.field "path" (Decode.list Decode.int))
+            (Decode.field "text" Decode.string)
+        )
+
+
+selectionDecoder : Decode.Decoder (Maybe Selection)
+selectionDecoder =
+    Decode.maybe
+        (Decode.succeed range
+            |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
+            |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
+            |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
+            |> andMap (Decode.at [ "focusOffset" ] Decode.int)
+        )
+
+
+range : Path -> Int -> Path -> Int -> Selection
+range aNode aOffset fNode fOffset =
+    Selection
+        { anchorOffset = aOffset
+        , anchorNode = aNode
+        , focusOffset = fOffset
+        , focusNode = fNode
+        }
 
 
 
@@ -866,6 +912,14 @@ type alias InputEvent =
     }
 
 
+beforeInputDecoder : Decoder InputEvent
+beforeInputDecoder =
+    Decode.succeed InputEvent
+        |> andMap (Decode.maybe (Decode.field "data" Decode.string))
+        |> andMap (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
+        |> andMap (Decode.field "inputType" Decode.string)
+
+
 
 -- Editor paste events.
 
@@ -874,6 +928,13 @@ type alias PasteEvent =
     { text : String
     , html : String
     }
+
+
+pasteWithDataDecoder : Decoder PasteEvent
+pasteWithDataDecoder =
+    Decode.succeed PasteEvent
+        |> andMap (Decode.at [ "detail", "text" ] Decode.string)
+        |> andMap (Decode.at [ "detail", "html" ] Decode.string)
 
 
 
