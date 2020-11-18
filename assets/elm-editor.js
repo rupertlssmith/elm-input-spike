@@ -330,15 +330,17 @@ class ElmEditor extends HTMLElement {
         // this.addEventListener("keyup", this.caretCallback.bind(this));
         // this.addEventListener("keydown", this.caretCallback.bind(this));
         this.dispatchInit = this.dispatchInit.bind(this);
-        this.repeatOften(this);
+        this.animationCallback();
 
         console.log("constructor completed");
 
     }
 
-    repeatOften(t) {
+    animationCallback() {
+       var element = this;
+
        requestAnimationFrame(function() {
-         const index = getCaretIndex(t);
+         const index = getCaretIndex(element);
          const coord = getCaretCoordinates();
          const newEvent = new CustomEvent("caretposition", {
              detail: {
@@ -347,9 +349,9 @@ class ElmEditor extends HTMLElement {
                  y: coord.y
              }
          });
-         t.dispatchEvent(newEvent);
+         element.dispatchEvent(newEvent);
 
-         t.repeatOften(t);
+         element.animationCallback();
        });
     }
 
