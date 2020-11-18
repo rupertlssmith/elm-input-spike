@@ -673,8 +673,26 @@ viewContent model =
         , HA.contenteditable True
         ]
         [ viewCursors model
-        , keyedViewLines startLine endLine model.buffer
+
+        --, keyedViewLines startLine endLine model.buffer
+        , viewLines startLine endLine model.buffer
         ]
+
+
+viewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
+viewLines start end buffer =
+    List.range start end
+        |> List.foldr
+            (\idx accum ->
+                case TextBuffer.getLine idx buffer of
+                    Nothing ->
+                        accum
+
+                    Just row ->
+                        viewLine idx row :: accum
+            )
+            []
+        |> H.div []
 
 
 keyedViewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
