@@ -566,6 +566,7 @@ global =
         , Css.property "user-select" "none"
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
+        , Css.outline3 (Css.px 0) Css.solid Css.transparent
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
@@ -609,7 +610,10 @@ editorView model =
             [ HA.id "editor-main-inner"
             , HA.tabindex 0
             ]
-            [ viewContent model
+            [ H.node "elm-editor"
+                []
+                [ viewContent model
+                ]
             ]
         ]
 
@@ -666,6 +670,7 @@ viewContent model =
     H.div
         [ HA.id "content-main"
         , HA.style "height" (String.fromFloat height ++ "px")
+        , HA.contenteditable True
         ]
         [ viewCursors model
         , keyedViewLines startLine endLine model.buffer
