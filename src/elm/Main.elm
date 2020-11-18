@@ -723,29 +723,60 @@ viewLine row line =
 
 
 
--- Scroll events
+-- Editor initialisation events.
 
 
-type alias ScrollEvent =
-    { scrollTop : Float
-    , scrollHeight : Float
-    , scrollLeft : Float
-    , scrollWidth : Float
+type alias InitEvent =
+    { shortKey : String
     }
 
 
-scrollDecoder : Decoder Msg
-scrollDecoder =
-    Decode.succeed ScrollEvent
-        |> andMap (Decode.at [ "target", "scrollTop" ] Decode.float)
-        |> andMap (Decode.at [ "target", "scrollHeight" ] Decode.float)
-        |> andMap (Decode.at [ "target", "scrollLeft" ] Decode.float)
-        |> andMap (Decode.at [ "target", "scrollWidth" ] Decode.float)
-        |> Decode.map Scroll
+
+-- Editor mutation events.
+
+
+type alias EditorChange =
+    { root : Decode.Value
+    , selection : Maybe Selection
+    , characterDataMutations : Maybe (List TextChange)
+    , timestamp : Int
+    , isComposing : Bool
+    }
+
+
+type Selection
+    = Selection Contents
+
+
+type alias Contents =
+    { anchorOffset : Int
+    , anchorNode : Path
+    , focusOffset : Int
+    , focusNode : Path
+    }
+
+
+type alias TextChange =
+    ( Path, String )
+
+
+type alias Path =
+    List Int
 
 
 
 -- Keyboard events.
+
+
+type alias KeyboardEvent =
+    { keyCode : Int
+    , key : String
+    , altKey : Bool
+    , metaKey : Bool
+    , ctrlKey : Bool
+    , shiftKey : Bool
+    , isComposing : Bool
+    }
 
 
 type alias KeyEvent =
@@ -805,6 +836,49 @@ keyToMsg keyEvent =
 
         _ ->
             Decode.fail "This key does nothing"
+
+
+
+-- Editor input events.
+
+
+type alias InputEvent =
+    { data : Maybe String
+    , isComposing : Bool
+    , inputType : String
+    }
+
+
+
+-- Editor paste events.
+
+
+type alias PasteEvent =
+    { text : String
+    , html : String
+    }
+
+
+
+-- Scroll events
+
+
+type alias ScrollEvent =
+    { scrollTop : Float
+    , scrollHeight : Float
+    , scrollLeft : Float
+    , scrollWidth : Float
+    }
+
+
+scrollDecoder : Decoder Msg
+scrollDecoder =
+    Decode.succeed ScrollEvent
+        |> andMap (Decode.at [ "target", "scrollTop" ] Decode.float)
+        |> andMap (Decode.at [ "target", "scrollHeight" ] Decode.float)
+        |> andMap (Decode.at [ "target", "scrollLeft" ] Decode.float)
+        |> andMap (Decode.at [ "target", "scrollWidth" ] Decode.float)
+        |> Decode.map Scroll
 
 
 
