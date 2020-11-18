@@ -143,7 +143,11 @@ subscriptions _ =
 
 
 type Msg
-    = Scroll ScrollEvent
+    = InitMsg InitEvent
+    | EditorChangeMsg EditorChange
+    | InputMsg InputEvent
+    | PasteMsg PasteEvent
+    | Scroll ScrollEvent
     | RandomBuffer (TextBuffer Tag Tag)
     | ContentViewPort (Result Browser.Dom.Error Viewport)
     | Resize
@@ -169,6 +173,34 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        InitMsg val ->
+            let
+                _ =
+                    Debug.log "InitMsg" val
+            in
+            ( model, Cmd.none )
+
+        EditorChangeMsg val ->
+            let
+                _ =
+                    Debug.log "EditorChangeMsg" val
+            in
+            ( model, Cmd.none )
+
+        InputMsg val ->
+            let
+                _ =
+                    Debug.log "InputMsg" val
+            in
+            ( model, Cmd.none )
+
+        PasteMsg val ->
+            let
+                _ =
+                    Debug.log "PasteMsg" val
+            in
+            ( model, Cmd.none )
+
         RandomBuffer buffer ->
             ( { model | buffer = buffer }, Cmd.none )
 
@@ -611,8 +643,13 @@ editorView model =
             , HA.tabindex 0
             ]
             [ H.node "elm-editor"
-                []
+                [ HE.on "editorinit" initDecoder
+                , HE.on "editorchange" editorChangeDecoder
+                , HE.on "beforeinput" beforeInputDecoder
+                , HE.on "pastewithdata" pasteWithDataDecoder
+                ]
                 [ viewContent model
+                , H.node "selection-state" [] []
                 ]
             ]
         ]
@@ -749,10 +786,11 @@ type alias InitEvent =
     }
 
 
-initDecoder : Decoder InitEvent
+initDecoder : Decoder Msg
 initDecoder =
     Decode.succeed InitEvent
         |> andMap (Decode.at [ "detail", "shortKey" ] Decode.string)
+        |> Decode.map InitMsg
 
 
 
@@ -788,7 +826,7 @@ type alias Path =
     List Int
 
 
-editorChangeDecoder : Decode.Decoder EditorChange
+editorChangeDecoder : Decode.Decoder Msg
 editorChangeDecoder =
     Decode.succeed EditorChange
         |> andMap (Decode.at [ "detail", "root" ] Decode.value)
@@ -796,6 +834,7 @@ editorChangeDecoder =
         |> andMap (Decode.maybe (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder))
         |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
         |> andMap (Decode.at [ "detail", "isComposing" ] (Decode.oneOf [ Decode.bool, Decode.succeed False ]))
+        |> Decode.map EditorChangeMsg
 
 
 characterDataMutationsDecoder : Decode.Decoder (List TextChange)
@@ -912,12 +951,13 @@ type alias InputEvent =
     }
 
 
-beforeInputDecoder : Decoder InputEvent
+beforeInputDecoder : Decoder Msg
 beforeInputDecoder =
     Decode.succeed InputEvent
         |> andMap (Decode.maybe (Decode.field "data" Decode.string))
         |> andMap (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
         |> andMap (Decode.field "inputType" Decode.string)
+        |> Decode.map InputMsg
 
 
 
@@ -930,11 +970,12 @@ type alias PasteEvent =
     }
 
 
-pasteWithDataDecoder : Decoder PasteEvent
+pasteWithDataDecoder : Decoder Msg
 pasteWithDataDecoder =
     Decode.succeed PasteEvent
         |> andMap (Decode.at [ "detail", "text" ] Decode.string)
         |> andMap (Decode.at [ "detail", "html" ] Decode.string)
+        |> Decode.map PasteMsg
 
 
 
@@ -960,6 +1001,45 @@ scrollDecoder =
 
 
 
+-- Event hooks
+-- onCompositionStart : (Message -> msg) -> Html.Attribute msg
+-- onCompositionStart msgFunc =
+--     Html.Events.on "compositionstart" (D.map msgFunc (D.succeed CompositionStart))
+--
+--
+-- onCompositionEnd : (Message -> msg) -> Html.Attribute msg
+-- onCompositionEnd msgFunc =
+--     Html.Events.on "editorcompositionend" (D.map msgFunc (D.succeed CompositionEnd))
+--
+--
+-- onPasteWithData : (Message -> msg) -> Html.Attribute msg
+-- onPasteWithData msgFunc =
+--     Html.Events.on "pastewithdata" (D.map msgFunc pasteWithDataDecoder)
+--
+--
+-- onCut : (Message -> msg) -> Html.Attribute msg
+-- onCut msgFunc =
+--     Html.Events.on "cut" (D.map msgFunc (D.succeed CutEvent))
+--
+--
+-- onInit : (Message -> msg) -> Html.Attribute msg
+-- onInit msgFunc =
+--     Html.Events.on "editorinit" (D.map msgFunc initDecoder)
+--
+--
+-- onEditorSelectionChange : (Message -> msg) -> Html.Attribute msg
+-- onEditorSelectionChange msgFunc =
+--     Html.Events.on "editorselectionchange" (D.map msgFunc editorSelectionChangeDecoder)
+--
+--
+-- onBeforeInput : Tagger msg -> CommandMap -> Spec -> Editor -> Html.Attribute msg
+-- onBeforeInput tagger commandMap_ spec_ editor_ =
+--     Html.Events.preventDefaultOn "beforeinput" (BeforeInput.preventDefaultOnBeforeInputDecoder tagger commandMap_ spec_ editor_)
+--
+--
+-- onKeyDown : Tagger msg -> CommandMap -> Spec -> Editor -> Html.Attribute msg
+-- onKeyDown tagger commandMap_ spec_ editor_ =
+--     Html.Events.preventDefaultOn "keydown" (KeyDown.preventDefaultOnKeyDownDecoder tagger commandMap_ spec_ editor_)
 -- Random buffer initialization.
 
 
