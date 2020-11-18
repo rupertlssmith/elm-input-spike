@@ -786,7 +786,7 @@ type alias Path =
 -- Keyboard events.
 
 
-type alias KeyboardEvent =
+type alias KeyEvent =
     { keyCode : Int
     , key : String
     , altKey : Bool
@@ -797,17 +797,16 @@ type alias KeyboardEvent =
     }
 
 
-type alias KeyEvent =
-    { key : String
-    , ctrlKey : Bool
-    }
-
-
 keyDecoder : Decoder ( Msg, Bool )
 keyDecoder =
     Decode.succeed KeyEvent
+        |> andMap (Decode.field "keyCode" Decode.int)
         |> andMap (Decode.field "key" Decode.string)
+        |> andMap (Decode.field "altKey" Decode.bool)
+        |> andMap (Decode.field "metaKey" Decode.bool)
         |> andMap (Decode.field "ctrlKey" Decode.bool)
+        |> andMap (Decode.field "shiftKey" Decode.bool)
+        |> andMap (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
         |> Decode.andThen keyToMsg
 
 
