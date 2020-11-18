@@ -349,7 +349,10 @@ class ElmEditor extends HTMLElement {
                  y: coord.y
              }
          });
-         element.dispatchEvent(newEvent);
+         if (index != element.index) {
+             element.dispatchEvent(newEvent);
+         }
+         element.index = index;
 
          element.animationCallback();
        });
