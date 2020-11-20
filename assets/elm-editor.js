@@ -1,6 +1,3 @@
-// Move caret on animation frame CodePen
-// https://codepen.io/shawnlukas/pen/GRJZMOW
-
 const zeroWidthSpace = "\u200B";
 
 const isAndroid = () => {
@@ -59,10 +56,6 @@ const getSelectionPath = (node, editor, offset) => {
     if (indexPath.length <= 2) {
       return null;
     }
-
-    // Drop the first two nodes
-    indexPath.shift();
-    indexPath.shift();
 
     return indexPath.slice();
   } catch (e) {

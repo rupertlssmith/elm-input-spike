@@ -189,12 +189,44 @@ update msg model =
             in
             ( model, Cmd.none )
 
-        EditorChangeMsg val ->
+        EditorChangeMsg change ->
             let
                 _ =
-                    Debug.log "EditorChangeMsg" val
+                    Debug.log "EditorChangeMsg" change
             in
-            ( model, Cmd.none )
+            -- type alias EditorChange =
+            --     { root : Decode.Value
+            --     , selection : Maybe Selection
+            --     , characterDataMutations : Maybe (List TextChange)
+            --     , timestamp : Int
+            --     , isComposing : Bool
+            --     }
+            --
+            --
+            -- type Selection
+            --     = Selection Contents
+            --
+            --
+            -- type alias Contents =
+            --     { anchorOffset : Int
+            --     , anchorNode : Path
+            --     , focusOffset : Int
+            --     , focusNode : Path
+            --     }
+            --
+            --
+            -- type alias TextChange =
+            --     ( Path, String )
+            --
+            --
+            -- type alias Path =
+            --     List Int
+            case change.characterDataMutations of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just textChanges ->
+                    ( model, Cmd.none )
 
         InputMsg val ->
             let
@@ -211,12 +243,6 @@ update msg model =
             ( model, Cmd.none )
 
         CaretMsg val ->
-            let
-                _ =
-                    Debug.log "CaretMsg" val
-            in
-            -- |> andThen (moveTo { row = 0, col = val.index })
-            -- |> andThen activity
             ( model, Cmd.none )
 
         Scroll scroll ->
@@ -668,8 +694,7 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
-
-        --, Css.property "caret-color" "transparent"
+        , Css.property "caret-color" "transparent"
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
