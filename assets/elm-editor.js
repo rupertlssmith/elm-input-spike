@@ -343,6 +343,18 @@ class ElmEditor extends HTMLElement {
 
   }
 
+  static get observedAttributes() {
+    return ['cursorindex'];
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch (name) {
+      case 'cursorindex':
+        console.log(`Value changed from ${oldValue} to ${newValue}`);
+        break;
+    }
+  }
+
   animationCallback() {
     var element = this;
 
@@ -369,7 +381,7 @@ class ElmEditor extends HTMLElement {
     this._observer.observe(this, {
       characterDataOldValue: true,
       attributeOldValue: false,
-      attributes: false,
+      attributes: true,
       childList: true,
       subtree: true,
       characterData: true

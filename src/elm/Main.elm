@@ -61,6 +61,7 @@ type alias Model =
     , linesPerPage : Int
     , startLine : Int
     , endLine : Int
+    , cursorIndex : Int
     , bufferHeight : Float
     , bottomOffset : Float
     , blinker : Bool
@@ -84,6 +85,7 @@ init _ =
       , linesPerPage = 0
       , startLine = 0
       , endLine = 0
+      , cursorIndex = 0
       , bufferHeight = 0.0
       , bottomOffset = 0.0
       , blinker = False
@@ -556,8 +558,16 @@ calcViewableRegion model =
 
         bufferHeight =
             (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
+
+        cursorIndex =
+            10
     in
-    ( { model | startLine = startLine, endLine = endLine, bufferHeight = bufferHeight }
+    ( { model
+        | startLine = startLine
+        , endLine = endLine
+        , bufferHeight = bufferHeight
+        , cursorIndex = cursorIndex
+      }
     , Cmd.none
     )
 
@@ -703,16 +713,8 @@ editorView model =
             [ HA.id "editor-main-inner"
             , HA.tabindex 0
             ]
-            [ H.node "elm-editor"
-                [ HE.on "editorinit" initDecoder
-                , HE.on "editorchange" editorChangeDecoder
-                , HE.on "beforeinput" beforeInputDecoder
-                , HE.on "pastewithdata" pasteWithDataDecoder
-                , HE.on "caretposition" caretPositionDecoder
-                ]
-                [ viewContent model
-                , H.node "selection-state" [] []
-                ]
+            [ viewContent model
+            , H.node "selection-state" [] []
             ]
         ]
 
@@ -759,7 +761,17 @@ viewContent model =
         [ viewCursors model
 
         --, keyedViewLines startLine endLine model.buffer
-        , viewLines model.startLine model.endLine model.buffer
+        , H.node "elm-editor"
+            [ HE.on "editorinit" initDecoder
+            , HE.on "editorchange" editorChangeDecoder
+            , HE.on "beforeinput" beforeInputDecoder
+            , HE.on "pastewithdata" pasteWithDataDecoder
+            , HE.on "caretposition" caretPositionDecoder
+            , HA.attribute "cursorindex" (String.fromInt model.cursorIndex)
+            ]
+            [ viewLines model.startLine model.endLine model.buffer
+            , H.node "selection-state" [] []
+            ]
         ]
 
 
