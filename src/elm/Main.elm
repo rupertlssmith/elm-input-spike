@@ -59,6 +59,9 @@ type alias Model =
     , scrollRow : Int
     , targetCol : Int
     , linesPerPage : Int
+    , startLine : Int
+    , endLine : Int
+    , bufferHeight : Float
     , bottomOffset : Float
     , blinker : Bool
     , lastActive : Posix
@@ -79,6 +82,9 @@ init _ =
       , scrollRow = 0
       , targetCol = 0
       , linesPerPage = 0
+      , startLine = 0
+      , endLine = 0
+      , bufferHeight = 0.0
       , bottomOffset = 0.0
       , blinker = False
       , lastActive = Time.millisToPosix 0
@@ -207,9 +213,9 @@ update msg model =
                 _ =
                     Debug.log "CaretMsg" val
             in
+            -- |> andThen (moveTo { row = 0, col = val.index })
+            -- |> andThen activity
             ( model, Cmd.none )
-                |> andThen (moveTo { row = 0, col = val.index })
-                |> andThen activity
 
         Scroll scroll ->
             ( { model
@@ -218,6 +224,7 @@ update msg model =
               }
             , Cmd.none
             )
+                |> andThen calcViewableRegion
 
         RandomBuffer buffer ->
             ( { model | buffer = buffer }, Cmd.none )
@@ -225,13 +232,9 @@ update msg model =
         ContentViewPort result ->
             case result of
                 Ok viewport ->
-                    ( { model
-                        | height = viewport.viewport.height
-                        , bottomOffset = bottomOffset viewport.viewport.height
-                        , linesPerPage = linesPerPage viewport.viewport.height
-                      }
-                    , Cmd.none
-                    )
+                    ( model, Cmd.none )
+                        |> andThen (establishViewport viewport)
+                        |> andThen calcViewableRegion
 
                 _ ->
                     ( model, Cmd.none )
@@ -244,6 +247,7 @@ update msg model =
                 |> andThen (moveCursorRowBy -1)
                 --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen activity
 
         MoveDown ->
@@ -251,6 +255,7 @@ update msg model =
                 |> andThen (moveCursorRowBy 1)
                 --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
@@ -263,6 +268,7 @@ update msg model =
                 |> andThen (cursorLeft lastColPrevRow)
                 --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen activity
 
         MoveRight ->
@@ -270,6 +276,7 @@ update msg model =
                 |> andThen cursorRight
                 --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
@@ -278,6 +285,7 @@ update msg model =
                 |> andThen (moveCursorRowBy -model.linesPerPage)
                 --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen activity
 
         PageDown ->
@@ -285,6 +293,7 @@ update msg model =
                 |> andThen (moveCursorRowBy model.linesPerPage)
                 --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
@@ -292,18 +301,21 @@ update msg model =
             ( model, Cmd.none )
                 |> andThen (moveCursorColBy -model.cursor.col)
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen activity
 
         LineEnd ->
             ( model, Cmd.none )
                 |> andThen (moveCursorColBy (TextBuffer.lastColumn model.buffer model.cursor.row - model.cursor.col))
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen activity
 
         FileHome ->
             ( model, Cmd.none )
                 |> andThen (moveTo { row = 0, col = 0 })
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen activity
 
         FileEnd ->
@@ -319,6 +331,7 @@ update msg model =
                         }
                     )
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
@@ -338,6 +351,7 @@ update msg model =
                 |> andThen backspace
                 |> andThen (cursorLeft lastColPrevRow)
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
@@ -345,6 +359,7 @@ update msg model =
             ( model, Cmd.none )
                 |> andThen delete
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
@@ -354,6 +369,7 @@ update msg model =
                 |> andThen (moveCursorRowBy 1)
                 |> andThen (moveCursorColBy -model.cursor.col)
                 |> andThen scrollIfNecessary
+                |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
@@ -510,6 +526,39 @@ scrollIfNecessary model =
     in
     ( { model | scrollRow = newScrollRow }
     , scrollCmd
+    )
+
+
+establishViewport : Viewport -> Model -> ( Model, Cmd Msg )
+establishViewport viewport model =
+    ( { model
+        | height = viewport.viewport.height
+        , bottomOffset = bottomOffset viewport.viewport.height
+        , linesPerPage = linesPerPage viewport.viewport.height
+      }
+    , Cmd.none
+    )
+
+
+calcViewableRegion : Model -> ( Model, Cmd Msg )
+calcViewableRegion model =
+    let
+        pad =
+            -- Ensure there is always 1 full page above and below for page up and down.
+            model.linesPerPage + 1
+
+        startLine =
+            max 0
+                ((model.top / config.lineHeight |> floor) - pad)
+
+        endLine =
+            ((model.top + model.height) / config.lineHeight |> floor) + pad
+
+        bufferHeight =
+            (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
+    in
+    ( { model | startLine = startLine, endLine = endLine, bufferHeight = bufferHeight }
+    , Cmd.none
     )
 
 
@@ -702,29 +751,15 @@ viewCursor model =
 
 viewContent : Model -> Html Msg
 viewContent model =
-    let
-        pad =
-            -- Ensure there is always 1 full page above and below for page up and down.
-            model.linesPerPage + 1
-
-        startLine =
-            max 0
-                ((model.top / config.lineHeight |> floor) - pad)
-
-        endLine =
-            ((model.top + model.height) / config.lineHeight |> floor) + pad
-
-        height =
-            (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
-    in
     H.div
         [ HA.id "content-main"
-        , HA.style "height" (String.fromFloat height ++ "px")
+        , HA.style "height" (String.fromFloat model.bufferHeight ++ "px")
         , HA.contenteditable True
         ]
-        [ -- viewCursors model
-          --, keyedViewLines startLine endLine model.buffer
-          viewLines startLine endLine model.buffer
+        [ viewCursors model
+
+        --, keyedViewLines startLine endLine model.buffer
+        , viewLines model.startLine model.endLine model.buffer
         ]
 
 
@@ -910,30 +945,33 @@ keyDecoder =
 keyToMsg : KeyEvent -> Decoder ( Msg, Bool )
 keyToMsg keyEvent =
     case keyEvent.key of
-        -- "ArrowUp" ->
-        --     Decode.succeed ( MoveUp, True )
-        --
-        -- "ArrowDown" ->
-        --     Decode.succeed ( MoveDown, True )
-        --
-        -- "ArrowLeft" ->
-        --     Decode.succeed ( MoveLeft, True )
-        --
-        -- "ArrowRight" ->
-        --     Decode.succeed ( MoveRight, True )
+        "ArrowUp" ->
+            Decode.succeed ( MoveUp, True )
+
+        "ArrowDown" ->
+            Decode.succeed ( MoveDown, True )
+
+        "ArrowLeft" ->
+            Decode.succeed ( MoveLeft, True )
+
+        "ArrowRight" ->
+            Decode.succeed ( MoveRight, True )
+
         "PageUp" ->
             Decode.succeed ( PageUp, True )
 
         "PageDown" ->
             Decode.succeed ( PageDown, True )
 
-        -- "Backspace" ->
-        --     Decode.succeed ( RemoveCharBefore, True )
-        --
-        -- "Delete" ->
-        --     Decode.succeed ( RemoveCharAfter, True )
-        -- "Enter" ->
-        --     Decode.succeed ( NewLine, True )
+        "Backspace" ->
+            Decode.succeed ( RemoveCharBefore, True )
+
+        "Delete" ->
+            Decode.succeed ( RemoveCharAfter, True )
+
+        "Enter" ->
+            Decode.succeed ( NewLine, True )
+
         "Home" ->
             if keyEvent.ctrlKey then
                 Decode.succeed ( FileHome, True )
