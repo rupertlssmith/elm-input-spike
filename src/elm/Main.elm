@@ -609,7 +609,8 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
-        , Css.property "caret-color" "transparent"
+
+        --, Css.property "caret-color" "transparent"
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
@@ -721,10 +722,9 @@ viewContent model =
         , HA.style "height" (String.fromFloat height ++ "px")
         , HA.contenteditable True
         ]
-        [ viewCursors model
-
-        --, keyedViewLines startLine endLine model.buffer
-        , viewLines startLine endLine model.buffer
+        [ -- viewCursors model
+          --, keyedViewLines startLine endLine model.buffer
+          viewLines startLine endLine model.buffer
         ]
 
 
