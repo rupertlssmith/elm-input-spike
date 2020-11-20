@@ -141,73 +141,18 @@ let adjustOffset = (node, offset) => {
   return offset;
 };
 
-function getCaretCoordinates() {
-  let x = 0,
-    y = 0;
-  const isSupported = typeof window.getSelection !== "undefined";
-  if (isSupported) {
-    const selection = window.getSelection();
-    // Check if there is a selection (i.e. cursor in place)
-    if (selection.rangeCount !== 0) {
-      // Clone the range
-      const range = selection.getRangeAt(0).cloneRange();
-      // Collapse the range to the start, so there are not multiple chars selected
-      range.collapse(true);
-      // getCientRects returns all the positioning information we need
-      const rect = range.getClientRects()[0];
-      if (rect) {
-        x = rect.left; // since the caret is only 1px wide, left == right
-        y = rect.top; // top edge of the caret
-      }
-    }
-  }
-  return {
-    x,
-    y
-  };
-}
-
-function getCaretIndex(element) {
-  let position = 0;
-  const isSupported = typeof window.getSelection !== "undefined";
-  if (isSupported) {
-    const selection = window.getSelection();
-    // Check if there is a selection (i.e. cursor in place)
-    if (selection.rangeCount !== 0) {
-      // Store the original range
-      // Clone the range
-      const range = window.getSelection().getRangeAt(0);
-      const preCaretRange = range.cloneRange();
-
-      // Select all textual contents from the contenteditable element
-      // And set the range end to the original clicked position
-      // Return the text length from contenteditable start to the range end
-      preCaretRange.selectNodeContents(element);
-      preCaretRange.setEnd(range.endContainer, range.endOffset);
-      position = preCaretRange.toString().length;
-    }
-  }
-  return position;
-}
-
 
 function setCaretPos(element, row, col) {
   var selection = window.getSelection();
 
   var range = document.createRange();
-  //console.log(element);
   node = findNodeFromPath([0, row, 0, 0], element);
-  //console.log(node);
 
   if (!!node) {
     range.setStart(node, col);
     range.collapse(true);
-
-    if (range) {
-      //range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
+    selection.removeAllRanges();
+    selection.addRange(range);
   }
 };
 
@@ -360,9 +305,6 @@ class ElmEditor extends HTMLElement {
     this.addEventListener("compositionend", this.compositionEnd.bind(this));
     this.dispatchInit = this.dispatchInit.bind(this);
     this.animationCallback();
-
-    console.log("constructor completed");
-
   }
 
   static get observedAttributes() {
@@ -372,11 +314,9 @@ class ElmEditor extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     switch (name) {
       case 'cursorrow':
-        console.log(`Row changed from ${oldValue} to ${newValue}`);
         this.cursorrow = newValue;
         break;
       case 'cursorcol':
-        console.log(`Col changed from ${oldValue} to ${newValue}`);
         this.cursorcol = newValue;
         break;
     }
@@ -388,19 +328,6 @@ class ElmEditor extends HTMLElement {
     var element = this;
 
     requestAnimationFrame(function() {
-      // const index = getCaretIndex(element);
-      // const coord = getCaretCoordinates();
-      // const newEvent = new CustomEvent("caretposition", {
-      //   detail: {
-      //     index: index,
-      //     x: coord.x,
-      //     y: coord.y
-      //   }
-      // });
-      // if (index != element.index) {
-      //   element.dispatchEvent(newEvent);
-      // }
-      // element.index = index;
       element.animationCallback();
       setCaretPos(element, element.cursorrow, element.cursorcol);
     });
@@ -479,16 +406,18 @@ class ElmEditor extends HTMLElement {
     const selection = this.childNodes[1].getSelectionObject();
 
     const characterDataMutations = this.characterDataMutations(mutationsList);
-    const event = new CustomEvent("editorchange", {
-      detail: {
-        root: element,
-        selection: selection,
-        isComposing: this.composing,
-        characterDataMutations: characterDataMutations,
-        timestamp: (new Date()).getTime()
-      }
-    });
-    this.dispatchEvent(event);
+    if (!!characterDataMutations) {
+      const event = new CustomEvent("editorchange", {
+        detail: {
+          root: element,
+          selection: selection,
+          isComposing: this.composing,
+          characterDataMutations: characterDataMutations,
+          timestamp: (new Date()).getTime()
+        }
+      });
+      this.dispatchEvent(event);
+    }
   };
 
   dispatchInit() {

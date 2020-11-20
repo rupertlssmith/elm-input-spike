@@ -1000,7 +1000,7 @@ keyToMsg keyEvent =
                 Decode.succeed ( LineEnd, True )
 
         _ ->
-            Decode.fail "This key does nothing"
+            Decode.succeed ( NoOp, False )
 
 
 
@@ -1021,6 +1021,7 @@ beforeInputDecoder =
         |> andMap (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
         |> andMap (Decode.field "inputType" Decode.string)
         |> Decode.map InputMsg
+        |> Decode.map (Debug.log "beforeinput")
 
 
 
