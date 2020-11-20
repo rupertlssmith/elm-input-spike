@@ -560,7 +560,7 @@ calcViewableRegion model =
             (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
 
         cursorIndex =
-            10
+            model.cursor.col
     in
     ( { model
         | startLine = startLine
@@ -767,7 +767,8 @@ viewContent model =
             , HE.on "beforeinput" beforeInputDecoder
             , HE.on "pastewithdata" pasteWithDataDecoder
             , HE.on "caretposition" caretPositionDecoder
-            , HA.attribute "cursorindex" (String.fromInt model.cursorIndex)
+            , HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
+            , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
             ]
             [ viewLines model.startLine model.endLine model.buffer
             , H.node "selection-state" [] []

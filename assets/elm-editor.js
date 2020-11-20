@@ -88,7 +88,8 @@ const findNodeFromPath = (path, editor) => {
   }
 
   let node = editor;
-  let newPath = [0, 0, ...path];
+  //let newPath = [0, 0, ...path];
+  let newPath = path;
   while (newPath.length && node) {
     let index = newPath.shift();
     node = node.childNodes && node.childNodes[index];
@@ -188,6 +189,27 @@ function getCaretIndex(element) {
   }
   return position;
 }
+
+
+function setCaretPos(element, row, col) {
+  var selection = window.getSelection();
+
+  var range = document.createRange();
+  //console.log(element);
+  node = findNodeFromPath([0, row, 0, 0], element);
+  //console.log(node);
+
+  if (!!node) {
+    range.setStart(node, col);
+    range.collapse(true);
+
+    if (range) {
+      //range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }
+};
 
 
 /**
@@ -344,36 +366,43 @@ class ElmEditor extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['cursorindex'];
+    return ['cursorrow', 'cursorcol'];
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
     switch (name) {
-      case 'cursorindex':
-        console.log(`Value changed from ${oldValue} to ${newValue}`);
+      case 'cursorrow':
+        console.log(`Row changed from ${oldValue} to ${newValue}`);
+        this.cursorrow = newValue;
+        break;
+      case 'cursorcol':
+        console.log(`Col changed from ${oldValue} to ${newValue}`);
+        this.cursorcol = newValue;
         break;
     }
+
+    setCaretPos(this, this.cursorrow, this.cursorcol);
   }
 
   animationCallback() {
     var element = this;
 
     requestAnimationFrame(function() {
-      const index = getCaretIndex(element);
-      const coord = getCaretCoordinates();
-      const newEvent = new CustomEvent("caretposition", {
-        detail: {
-          index: index,
-          x: coord.x,
-          y: coord.y
-        }
-      });
-      if (index != element.index) {
-        element.dispatchEvent(newEvent);
-      }
-      element.index = index;
-
+      // const index = getCaretIndex(element);
+      // const coord = getCaretCoordinates();
+      // const newEvent = new CustomEvent("caretposition", {
+      //   detail: {
+      //     index: index,
+      //     x: coord.x,
+      //     y: coord.y
+      //   }
+      // });
+      // if (index != element.index) {
+      //   element.dispatchEvent(newEvent);
+      // }
+      // element.index = index;
       element.animationCallback();
+      setCaretPos(element, element.cursorrow, element.cursorcol);
     });
   }
 
