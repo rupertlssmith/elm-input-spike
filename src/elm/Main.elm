@@ -221,11 +221,29 @@ update msg model =
             --
             -- type alias Path =
             --     List Int
-            case change.characterDataMutations of
-                Nothing ->
+            case ( change.characterDataMutations, change.selection ) of
+                ( Just textChanges, Just (Selection selection) ) ->
+                    let
+                        _ =
+                            List.foldl
+                                (\textChange accum ->
+                                    if Tuple.first textChange == selection.focusNode then
+                                        case selection.focusNode of
+                                            _ :: row :: _ ->
+                                                { accum | buffer = insertLine row selection.focusOffset }
+
+                                            _ ->
+                                                accum
+
+                                    else
+                                        accum
+                                )
+                                []
+                                textChanges
+                    in
                     ( model, Cmd.none )
 
-                Just textChanges ->
+                _ ->
                     ( model, Cmd.none )
 
         InputMsg val ->
