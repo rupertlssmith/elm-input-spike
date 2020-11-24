@@ -194,54 +194,13 @@ update msg model =
                 _ =
                     Debug.log "EditorChangeMsg" change
             in
-            -- type alias EditorChange =
-            --     { root : Decode.Value
-            --     , selection : Maybe Selection
-            --     , characterDataMutations : Maybe (List TextChange)
-            --     , timestamp : Int
-            --     , isComposing : Bool
-            --     }
-            --
-            --
-            -- type Selection
-            --     = Selection Contents
-            --
-            --
-            -- type alias Contents =
-            --     { anchorOffset : Int
-            --     , anchorNode : Path
-            --     , focusOffset : Int
-            --     , focusNode : Path
-            --     }
-            --
-            --
-            -- type alias TextChange =
-            --     ( Path, String )
-            --
-            --
-            -- type alias Path =
-            --     List Int
             case ( change.characterDataMutations, change.selection ) of
                 ( Just textChanges, Just (Selection selection) ) ->
-                    let
-                        _ =
-                            List.foldl
-                                (\textChange accum ->
-                                    if Tuple.first textChange == selection.focusNode then
-                                        case selection.focusNode of
-                                            _ :: row :: _ ->
-                                                { accum | buffer = insertLine row selection.focusOffset }
-
-                                            _ ->
-                                                accum
-
-                                    else
-                                        accum
-                                )
-                                []
-                                textChanges
-                    in
                     ( model, Cmd.none )
+                        |> andThen (editLine textChanges selection)
+                        |> andThen (moveCursorColBy 1)
+                        |> andThen rippleBuffer
+                        |> andThen activity
 
                 _ ->
                     ( model, Cmd.none )
@@ -621,6 +580,29 @@ rippleBuffer model =
     ( { model | buffer = TextBuffer.rippleTo (model.scrollRow + model.linesPerPage) model.buffer }
     , Cmd.none
     )
+
+
+editLine : List TextChange -> Contents -> Model -> ( Model, Cmd Msg )
+editLine textChanges selection model =
+    let
+        editedModel =
+            List.foldl
+                (\textChange accum ->
+                    if Tuple.first textChange == selection.focusNode then
+                        case selection.focusNode of
+                            _ :: row :: _ ->
+                                { accum | buffer = TextBuffer.setLineAt (Tuple.second textChange) row accum.buffer }
+
+                            _ ->
+                                accum
+
+                    else
+                        accum
+                )
+                model
+                textChanges
+    in
+    ( editedModel, Cmd.none )
 
 
 insertChar : Char -> Model -> ( Model, Cmd Msg )

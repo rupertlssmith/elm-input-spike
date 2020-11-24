@@ -211,6 +211,14 @@ refocus row col buffer =
 -- Make changes to a buffers contents
 
 
+setLineAt : String -> Int -> TextBuffer tag ctx -> TextBuffer tag ctx
+setLineAt val row buffer =
+    { buffer
+        | lines = GapBuffer.setFocus row (stringToCharBuffer val) buffer.lines
+        , ripples = Set.insert row buffer.ripples
+    }
+
+
 breakLine : Int -> Int -> TextBuffer tag ctx -> TextBuffer tag ctx
 breakLine row col buffer =
     let
