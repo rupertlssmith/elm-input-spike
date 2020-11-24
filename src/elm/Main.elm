@@ -35,8 +35,8 @@ config =
     { fontSize = fontSize
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
-    , lineLength = 120
-    , numLines = 10000
+    , lineLength = 12
+    , numLines = 10
     , blinkInterval = 400
     }
 
@@ -588,16 +588,24 @@ editLine textChanges selection model =
         editedModel =
             List.foldl
                 (\textChange accum ->
-                    if Tuple.first textChange == selection.focusNode then
-                        case selection.focusNode of
-                            _ :: row :: _ ->
-                                { accum | buffer = TextBuffer.setLineAt (Tuple.second textChange) row accum.buffer }
+                    case
+                        Tuple.mapSecond (String.toList >> List.drop (selection.focusOffset - 1) >> List.head) textChange
+                    of
+                        ( _ :: row :: _, Just char ) ->
+                            if row == model.cursor.row then
+                                { accum
+                                    | buffer =
+                                        TextBuffer.insertCharAt char
+                                            model.cursor.row
+                                            model.cursor.col
+                                            accum.buffer
+                                }
 
-                            _ ->
+                            else
                                 accum
 
-                    else
-                        accum
+                        _ ->
+                            accum
                 )
                 model
                 textChanges

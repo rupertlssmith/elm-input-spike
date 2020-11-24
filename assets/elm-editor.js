@@ -301,7 +301,8 @@ class ElmEditor extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['cursorrow', 'cursorcol'];
+    //return ['cursorrow', 'cursorcol'];
+    return ['cursorrow'];
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
