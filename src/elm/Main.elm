@@ -35,8 +35,8 @@ config =
     { fontSize = fontSize
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
-    , lineLength = 12
-    , numLines = 10
+    , lineLength = 120
+    , numLines = 10000
     , blinkInterval = 400
     }
 
@@ -66,6 +66,7 @@ type alias Model =
     , bottomOffset : Float
     , blinker : Bool
     , lastActive : Posix
+    , editKey : Int
     }
 
 
@@ -90,6 +91,7 @@ init _ =
       , bottomOffset = 0.0
       , blinker = False
       , lastActive = Time.millisToPosix 0
+      , editKey = 0
       }
     , Cmd.batch
         [ Task.perform RandomBuffer (randomBuffer config.lineLength config.numLines |> randomToTask)
@@ -610,7 +612,7 @@ editLine textChanges selection model =
                 model
                 textChanges
     in
-    ( editedModel, Cmd.none )
+    ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
 
 
 insertChar : Char -> Model -> ( Model, Cmd Msg )
@@ -702,8 +704,7 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
-
-        --, Css.property "caret-color" "transparent"
+        , Css.property "caret-color" "transparent"
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
@@ -802,49 +803,31 @@ viewContent model =
             , HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
             , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
             ]
-            [ viewLines model.startLine model.endLine model.buffer
+            [ --viewLines model.startLine model.endLine model.buffer
+              keyedViewLines model
             , H.node "selection-state" [] []
             ]
         ]
 
 
-viewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
-viewLines start end buffer =
-    List.range start end
+keyedViewLines : Model -> Html Msg
+keyedViewLines model =
+    List.range model.startLine model.endLine
         |> List.foldr
             (\idx accum ->
-                case TextBuffer.getLine idx buffer of
+                case TextBuffer.getLine idx model.buffer of
                     Nothing ->
                         accum
 
                     Just row ->
-                        viewLine idx row :: accum
-            )
-            []
-        |> H.div []
+                        if model.cursor.row == idx then
+                            ( "edit-" ++ String.fromInt model.editKey, viewLine idx row ) :: accum
 
-
-keyedViewLines : Int -> Int -> TextBuffer Tag Tag -> Html Msg
-keyedViewLines start end buffer =
-    List.range start end
-        |> List.foldr
-            (\idx accum ->
-                case TextBuffer.getLine idx buffer of
-                    Nothing ->
-                        accum
-
-                    Just row ->
-                        viewKeyedLine idx row :: accum
+                        else
+                            ( String.fromInt idx, Html.Lazy.lazy2 viewLine idx row ) :: accum
             )
             []
         |> Keyed.node "div" []
-
-
-viewKeyedLine : Int -> TextBuffer.Line Tag Tag -> ( String, Html Msg )
-viewKeyedLine row content =
-    ( String.fromInt row
-    , Html.Lazy.lazy2 viewLine row content
-    )
 
 
 viewLine : Int -> TextBuffer.Line Tag Tag -> Html Msg
