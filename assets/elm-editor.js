@@ -4,14 +4,6 @@ const isAndroid = () => {
   return /(android)/i.test(navigator.userAgent);
 };
 
-/**
- * Finds the selection path given the node, editor, and selection offset
- *
- * @param node - the DOM Node we're searching for
- * @param editor - a reference to the editor webcomponent
- * @param offset - the selection path offset if one exists
- * @returns {null|*[]} an array of indexes from the editor document root to the node, otherwise null.
- */
 const getSelectionPath = (node, editor, offset) => {
   const originalNode = node;
   if (!node) {
@@ -59,18 +51,10 @@ const getSelectionPath = (node, editor, offset) => {
 
     return indexPath.slice();
   } catch (e) {
-    // Sometimes we can get errors from trying to access properties like "tagName".  In that
-    // just return null.
     return null;
   }
 };
 
-/**
- * Finds a node given a path.  Returns null if no node exists
- * @param path - an array of indexes or null
- * @param editor - a reference to the editor webcomponent
- * @returns {null|ChildNode|*} Returns the node this path refers to, null otherwise.
- */
 const findNodeFromPath = (path, editor) => {
   if (!path) {
     return null;
@@ -81,8 +65,8 @@ const findNodeFromPath = (path, editor) => {
   }
 
   let node = editor;
-  //let newPath = [0, 0, ...path];
   let newPath = path;
+
   while (newPath.length && node) {
     let index = newPath.shift();
     node = node.childNodes && node.childNodes[index];
@@ -91,14 +75,6 @@ const findNodeFromPath = (path, editor) => {
   return node || null;
 };
 
-
-/**
- * Helper method to account for zeroWidthSpace and selection offsets that exceed the actual node
- * length.
- * @param node - a reference to the node this offset refers to
- * @param offset - the offset in question
- * @returns {number|*} the new offset
- */
 let adjustOffsetReverse = (node, offset) => {
   if (node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace) {
     return 1;
@@ -109,16 +85,6 @@ let adjustOffsetReverse = (node, offset) => {
   return offset;
 };
 
-/**
- * Helper method to account for zeroWidthSpace and simplifying boundary selection by selecting
- * the child node and setting the offset to 0.  Note that this sometimes leads to invalid
- * selections, but I think it's better than the alternative of trying to derive the boundary logic
- * in Elm.
- *
- * @param node - a reference to the node this offset refers to
- * @param offset - the offset in question
- * @returns {number|*} the new offset
- */
 let adjustOffset = (node, offset) => {
   if ((node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace)) {
     return 0;
@@ -134,7 +100,6 @@ let adjustOffset = (node, offset) => {
   return offset;
 };
 
-
 function setCaretPos(element, row, col) {
   var selection = window.getSelection();
 
@@ -149,11 +114,6 @@ function setCaretPos(element, row, col) {
   }
 };
 
-
-/**
- * SelectionState is a webcomponent that syncs the editor's selection state with the selection
- * API.
- */
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
     return ["selection"];
@@ -189,7 +149,6 @@ class SelectionState extends HTMLElement {
       try {
         sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
       } catch (e) {
-        // ignore selection errors
       }
     }
   }
@@ -243,18 +202,26 @@ class SelectionState extends HTMLElement {
   };
 }
 
-/**
- * ElmEditor is the top level webcomponent responsible for enabling web APIs like clipboard
- * and mutation observers to be visible in Elm.  It uses custom events which are handled
- * by Elm event listeners.
- */
 class ElmEditor extends HTMLElement {
+
+  constructor() {
+    super();
+    this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
+    this.pasteCallback = this.pasteCallback.bind(this);
+    this._observer = new MutationObserver(this.mutationObserverCallback);
+    this.addEventListener("paste", this.pasteCallback);
+    this.addEventListener("compositionstart", this.compositionStart.bind(this));
+    this.addEventListener("compositionend", this.compositionEnd.bind(this));
+    this.dispatchInit = this.dispatchInit.bind(this);
+  }
+
+  static get observedAttributes() {
+    return ['cursorrow'];
+  }
 
   compositionStart() {
     this.composing = true;
 
-    // Sometimes Android never fires compositionend... so we need to make sure it gets called
-    // eventually.
     if (isAndroid()) {
       if (this.lastCompositionTimeout) {
         clearTimeout(this.lastCompositionTimeout);
@@ -270,13 +237,11 @@ class ElmEditor extends HTMLElement {
       }, 5000);
       this.lastCompositionTimeout = lastCompositionTimeout
     }
-
   }
 
   compositionEnd() {
     this.composing = false;
-    // Use a custom composition end function since in some browsers, it gets fired before
-    // the last keydown event occurs.
+
     setTimeout(() => {
       if (!this.composing) {
         const newEvent = new CustomEvent("editorcompositionend", {
@@ -285,24 +250,6 @@ class ElmEditor extends HTMLElement {
         this.dispatchEvent(newEvent);
       }
     }, 0)
-
-  }
-
-  constructor() {
-    super();
-    this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
-    this.pasteCallback = this.pasteCallback.bind(this);
-    this._observer = new MutationObserver(this.mutationObserverCallback);
-    this.addEventListener("paste", this.pasteCallback);
-    this.addEventListener("compositionstart", this.compositionStart.bind(this));
-    this.addEventListener("compositionend", this.compositionEnd.bind(this));
-    this.dispatchInit = this.dispatchInit.bind(this);
-    //this.animationCallback();
-  }
-
-  static get observedAttributes() {
-    //return ['cursorrow', 'cursorcol'];
-    return ['cursorrow'];
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -314,17 +261,8 @@ class ElmEditor extends HTMLElement {
         this.cursorcol = newValue;
         break;
     }
-    console.log("Changed cursor pos");
+    
     setCaretPos(this, this.cursorrow, this.cursorcol);
-  }
-
-  animationCallback() {
-    var element = this;
-
-    requestAnimationFrame(function() {
-      element.animationCallback();
-      setCaretPos(element, element.cursorrow, element.cursorcol);
-    });
   }
 
   connectedCallback() {
@@ -373,10 +311,6 @@ class ElmEditor extends HTMLElement {
     }
   }
 
-  /**
-   * Returns a list of selection path and text if all the mutations are characterData.  Otherwise
-   * returns null.
-   */
   characterDataMutations(mutationsList) {
     if (!mutationsList) {
       return null;
