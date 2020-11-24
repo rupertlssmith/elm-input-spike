@@ -1,118 +1,3 @@
-const zeroWidthSpace = "\u200B";
-
-const isAndroid = () => {
-  return /(android)/i.test(navigator.userAgent);
-};
-
-const getSelectionPath = (node, editor, offset) => {
-  const originalNode = node;
-  if (!node) {
-    return null;
-  }
-
-  let path = [];
-  try {
-    while (node && node.tagName !== "BODY") {
-      path.push(node);
-      if (node === editor) {
-        break;
-      }
-      node = node.parentNode
-    }
-
-    if (path[path.length - 1] !== editor) {
-      return null
-    }
-
-    let indexPath = [];
-    for (let i = 0; i < path.length - 1; i += 1) {
-      let child = path[i];
-      let parent = path[i + 1];
-
-      let index = 0;
-      for (let childNode of parent.childNodes) {
-        if (childNode === child) {
-          break;
-        }
-        index += 1;
-      }
-      indexPath.unshift(index);
-    }
-
-    if (originalNode.nodeType === Node.ELEMENT_NODE && offset > 0) {
-      indexPath.push(offset - 1)
-    } else if (originalNode.nodeType === Node.ELEMENT_NODE && originalNode.childNodes[0]) {
-      indexPath.push(0)
-    }
-
-    if (indexPath.length <= 2) {
-      return null;
-    }
-
-    return indexPath.slice();
-  } catch (e) {
-    return null;
-  }
-};
-
-const findNodeFromPath = (path, editor) => {
-  if (!path) {
-    return null;
-  }
-
-  if (typeof path === "string") {
-    path = path.split(":").map((v) => Number(v));
-  }
-
-  let node = editor;
-  let newPath = path;
-
-  while (newPath.length && node) {
-    let index = newPath.shift();
-    node = node.childNodes && node.childNodes[index];
-  }
-
-  return node || null;
-};
-
-let adjustOffsetReverse = (node, offset) => {
-  if (node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace) {
-    return 1;
-  }
-  if (node.nodeType === Node.TEXT_NODE && offset > node.nodeValue.length) {
-    return node.nodeValue.length;
-  }
-  return offset;
-};
-
-let adjustOffset = (node, offset) => {
-  if ((node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace)) {
-    return 0;
-  }
-
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    let childNode = node.childNodes[offset - 1];
-    if (childNode && childNode.nodeType === Node.TEXT_NODE) {
-      return (childNode.nodeValue || "").length
-    }
-  }
-
-  return offset;
-};
-
-function setCaretPos(element, row, col) {
-  var selection = window.getSelection();
-
-  var range = document.createRange();
-  node = findNodeFromPath([0, row, 0, 0], element);
-
-  if (!!node) {
-    range.setStart(node, col);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
-};
 
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
@@ -261,7 +146,7 @@ class ElmEditor extends HTMLElement {
         this.cursorcol = newValue;
         break;
     }
-    
+
     setCaretPos(this, this.cursorrow, this.cursorcol);
   }
 
@@ -365,3 +250,119 @@ class ElmEditor extends HTMLElement {
 
 customElements.define('elm-editor', ElmEditor);
 customElements.define('selection-state', SelectionState);
+
+const zeroWidthSpace = "\u200B";
+
+const isAndroid = () => {
+  return /(android)/i.test(navigator.userAgent);
+};
+
+const getSelectionPath = (node, editor, offset) => {
+  const originalNode = node;
+  if (!node) {
+    return null;
+  }
+
+  let path = [];
+  try {
+    while (node && node.tagName !== "BODY") {
+      path.push(node);
+      if (node === editor) {
+        break;
+      }
+      node = node.parentNode
+    }
+
+    if (path[path.length - 1] !== editor) {
+      return null
+    }
+
+    let indexPath = [];
+    for (let i = 0; i < path.length - 1; i += 1) {
+      let child = path[i];
+      let parent = path[i + 1];
+
+      let index = 0;
+      for (let childNode of parent.childNodes) {
+        if (childNode === child) {
+          break;
+        }
+        index += 1;
+      }
+      indexPath.unshift(index);
+    }
+
+    if (originalNode.nodeType === Node.ELEMENT_NODE && offset > 0) {
+      indexPath.push(offset - 1)
+    } else if (originalNode.nodeType === Node.ELEMENT_NODE && originalNode.childNodes[0]) {
+      indexPath.push(0)
+    }
+
+    if (indexPath.length <= 2) {
+      return null;
+    }
+
+    return indexPath.slice();
+  } catch (e) {
+    return null;
+  }
+};
+
+const findNodeFromPath = (path, editor) => {
+  if (!path) {
+    return null;
+  }
+
+  if (typeof path === "string") {
+    path = path.split(":").map((v) => Number(v));
+  }
+
+  let node = editor;
+  let newPath = path;
+
+  while (newPath.length && node) {
+    let index = newPath.shift();
+    node = node.childNodes && node.childNodes[index];
+  }
+
+  return node || null;
+};
+
+let adjustOffsetReverse = (node, offset) => {
+  if (node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace) {
+    return 1;
+  }
+  if (node.nodeType === Node.TEXT_NODE && offset > node.nodeValue.length) {
+    return node.nodeValue.length;
+  }
+  return offset;
+};
+
+let adjustOffset = (node, offset) => {
+  if ((node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace)) {
+    return 0;
+  }
+
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    let childNode = node.childNodes[offset - 1];
+    if (childNode && childNode.nodeType === Node.TEXT_NODE) {
+      return (childNode.nodeValue || "").length
+    }
+  }
+
+  return offset;
+};
+
+function setCaretPos(element, row, col) {
+  var selection = window.getSelection();
+
+  var range = document.createRange();
+  node = findNodeFromPath([0, row, 0, 0], element);
+
+  if (!!node) {
+    range.setStart(node, col);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+};
