@@ -297,7 +297,7 @@ class ElmEditor extends HTMLElement {
     this.addEventListener("compositionstart", this.compositionStart.bind(this));
     this.addEventListener("compositionend", this.compositionEnd.bind(this));
     this.dispatchInit = this.dispatchInit.bind(this);
-    this.animationCallback();
+    //this.animationCallback();
   }
 
   static get observedAttributes() {
@@ -313,7 +313,7 @@ class ElmEditor extends HTMLElement {
         this.cursorcol = newValue;
         break;
     }
-
+    console.log("Changed cursor pos");
     setCaretPos(this, this.cursorrow, this.cursorcol);
   }
 

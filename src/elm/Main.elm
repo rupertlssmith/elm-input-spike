@@ -694,7 +694,8 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
-        , Css.property "caret-color" "transparent"
+
+        --, Css.property "caret-color" "transparent"
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
@@ -738,9 +739,7 @@ editorView model =
             [ HA.id "editor-main-inner"
             , HA.tabindex 0
             ]
-            [ viewContent model
-            , H.node "selection-state" [] []
-            ]
+            [ viewContent model ]
         ]
 
 
