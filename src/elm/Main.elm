@@ -1,7 +1,5 @@
 module Main exposing (main)
 
---import GapBuffer exposing (Buffer)
-
 import Array exposing (Array)
 import Browser exposing (Document)
 import Browser.Dom exposing (Viewport)
@@ -185,17 +183,9 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         InitMsg val ->
-            let
-                _ =
-                    Debug.log "InitMsg" val
-            in
             ( model, Cmd.none )
 
         EditorChangeMsg change ->
-            let
-                _ =
-                    Debug.log "EditorChangeMsg" change
-            in
             case ( change.characterDataMutations, change.selection ) of
                 ( Just textChanges, Just (Selection selection) ) ->
                     ( model, Cmd.none )
@@ -208,17 +198,9 @@ update msg model =
                     ( model, Cmd.none )
 
         InputMsg val ->
-            let
-                _ =
-                    Debug.log "InputMsg" val
-            in
             ( model, Cmd.none )
 
         PasteMsg val ->
-            let
-                _ =
-                    Debug.log "PasteMsg" val
-            in
             ( model, Cmd.none )
 
         CaretMsg val ->
@@ -252,7 +234,6 @@ update msg model =
         MoveUp ->
             ( model, Cmd.none )
                 |> andThen (moveCursorRowBy -1)
-                --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
@@ -260,7 +241,6 @@ update msg model =
         MoveDown ->
             ( model, Cmd.none )
                 |> andThen (moveCursorRowBy 1)
-                --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
@@ -273,7 +253,6 @@ update msg model =
             in
             ( model, Cmd.none )
                 |> andThen (cursorLeft lastColPrevRow)
-                --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
@@ -281,7 +260,6 @@ update msg model =
         MoveRight ->
             ( model, Cmd.none )
                 |> andThen cursorRight
-                --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
@@ -290,7 +268,6 @@ update msg model =
         PageUp ->
             ( model, Cmd.none )
                 |> andThen (moveCursorRowBy -model.linesPerPage)
-                --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
@@ -298,7 +275,6 @@ update msg model =
         PageDown ->
             ( model, Cmd.none )
                 |> andThen (moveCursorRowBy model.linesPerPage)
-                --|> andThen refocusBuffer
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
@@ -792,8 +768,6 @@ viewContent model =
         , HA.contenteditable True
         ]
         [ viewCursors model
-
-        --, keyedViewLines startLine endLine model.buffer
         , H.node "elm-editor"
             [ HE.on "editorinit" initDecoder
             , HE.on "editorchange" editorChangeDecoder
@@ -803,8 +777,7 @@ viewContent model =
             , HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
             , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
             ]
-            [ --viewLines model.startLine model.endLine model.buffer
-              keyedViewLines model
+            [ keyedViewLines model
             , H.node "selection-state" [] []
             ]
         ]
@@ -1036,7 +1009,6 @@ beforeInputDecoder =
         |> andMap (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
         |> andMap (Decode.field "inputType" Decode.string)
         |> Decode.map InputMsg
-        |> Decode.map (Debug.log "beforeinput")
 
 
 
