@@ -34,7 +34,7 @@ config =
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
     , lineLength = 120
-    , numLines = 10000
+    , numLines = 10
     , blinkInterval = 400
     }
 
@@ -680,7 +680,8 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
-        , Css.property "caret-color" "transparent"
+
+        --, Css.property "caret-color" "transparent"
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
@@ -707,7 +708,8 @@ view : Model -> Document Msg
 view model =
     { title = "Input Spike"
     , body =
-        [ Css.Global.global global |> Html.Styled.toUnstyled
+        [ Css.Global.global global
+            |> Html.Styled.toUnstyled
         , editorView model
         ]
     }
@@ -724,7 +726,9 @@ editorView model =
             [ HA.id "editor-main-inner"
             , HA.tabindex 0
             ]
-            [ viewContent model ]
+            [ -- viewContent model
+              copyViewContent model
+            ]
         ]
 
 
@@ -760,12 +764,19 @@ viewCursor model =
         [ H.text "" ]
 
 
+copyViewContent model =
+    H.node "copy-dom"
+        []
+        [ viewContent model ]
+
+
 viewContent : Model -> Html Msg
 viewContent model =
     H.div
         [ HA.id "content-main"
         , HA.style "height" (String.fromFloat model.bufferHeight ++ "px")
         , HA.contenteditable True
+        , HA.hidden True
         ]
         [ viewCursors model
         , H.node "elm-editor"
