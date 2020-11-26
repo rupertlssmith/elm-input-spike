@@ -673,7 +673,7 @@ global =
         , Css.flexDirection Css.row
         , Css.outline Css.none
         ]
-    , Css.Global.id "content-main"
+    , Css.Global.class "content-main"
         [ Css.position Css.relative
         , Css.property "flex" "1"
         , Css.property "user-select" "none"
@@ -727,7 +727,7 @@ editorView model =
             , HA.tabindex 0
             ]
             [ -- viewContent model
-              copyViewContent model
+              viewContent model
             ]
         ]
 
@@ -773,10 +773,11 @@ copyViewContent model =
 viewContent : Model -> Html Msg
 viewContent model =
     H.div
-        [ HA.id "content-main"
+        [ HA.class "content-main"
         , HA.style "height" (String.fromFloat model.bufferHeight ++ "px")
         , HA.contenteditable True
-        , HA.hidden True
+
+        --, HA.hidden True
         ]
         [ viewCursors model
         , H.node "elm-editor"
