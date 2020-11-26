@@ -15,13 +15,18 @@ class CopyDom extends HTMLElement {
     requestAnimationFrame(function() {
       element.animationCallback();
 
-      var clone = element.firstChild.cloneNode(true);
-      clone.removeAttribute("hidden");
+      var source = element.querySelector('[data-elm-dom]');
 
-      if (element.childElementCount > 1)
-          element.removeChild(element.lastChild);
+      var target = element.querySelector('[data-copy-dom]');
+      while (target.firstChild) {
+        target.removeChild(target.lastChild);
+      }
 
-      element.appendChild(clone);
+      var children = source.children;
+      for (var i = children.length - 1; i >= 0; i--) {
+          var clone = children[i].cloneNode(true);
+          target.appendChild(clone);
+      }
     });
   }
 

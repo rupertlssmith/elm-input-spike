@@ -34,7 +34,7 @@ config =
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
     , lineLength = 120
-    , numLines = 10
+    , numLines = 200
     , blinkInterval = 400
     }
 
@@ -727,7 +727,7 @@ editorView model =
             , HA.tabindex 0
             ]
             [ -- viewContent model
-              viewContent model
+              copyViewContent model
             ]
         ]
 
@@ -766,33 +766,38 @@ viewCursor model =
 
 copyViewContent model =
     H.node "copy-dom"
-        []
-        [ viewContent model ]
+        [ HA.class "content-main"
+        , HA.style "height" (String.fromFloat model.bufferHeight ++ "px")
+        ]
+        [ viewCursors model
+        , H.div
+            [ HA.attribute "data-elm-dom" "true"
+            , HA.hidden True
+            ]
+            [ viewContent model ]
+        , H.div [ HA.attribute "data-copy-dom" "true" ] []
+        ]
 
 
 viewContent : Model -> Html Msg
 viewContent model =
     H.div
-        [ HA.class "content-main"
-        , HA.style "height" (String.fromFloat model.bufferHeight ++ "px")
-        , HA.contenteditable True
-
-        --, HA.hidden True
+        [--HA.contenteditable True
         ]
-        [ viewCursors model
-        , H.node "elm-editor"
-            [ HE.on "editorinit" initDecoder
-            , HE.on "editorchange" editorChangeDecoder
-            , HE.on "beforeinput" beforeInputDecoder
-            , HE.on "pastewithdata" pasteWithDataDecoder
-            , HE.on "caretposition" caretPositionDecoder
-            , HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
-            , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
-            ]
-            [ keyedViewLines model
-            , H.node "selection-state" [] []
-            ]
-        ]
+        -- [ H.node "elm-editor"
+        --     [ HE.on "editorinit" initDecoder
+        --     , HE.on "editorchange" editorChangeDecoder
+        --     , HE.on "beforeinput" beforeInputDecoder
+        --     , HE.on "pastewithdata" pasteWithDataDecoder
+        --     , HE.on "caretposition" caretPositionDecoder
+        --     , HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
+        --     , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
+        --     ]
+        --     [ keyedViewLines model
+        --     , H.node "selection-state" [] []
+        --     ]
+        -- ]
+        [ keyedViewLines model ]
 
 
 keyedViewLines : Model -> Html Msg
