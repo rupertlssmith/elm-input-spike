@@ -155,8 +155,8 @@ type Msg
     | EditorChangeMsg EditorChange
     | InputMsg InputEvent
     | PasteMsg PasteEvent
+    | SelectionChange (Maybe Selection)
     | Scroll ScrollEvent
-    | CaretMsg CaretPosition
     | RandomBuffer (TextBuffer Tag Tag)
     | ContentViewPort (Result Browser.Dom.Error Viewport)
     | Resize
@@ -187,7 +187,7 @@ update msg model =
 
         EditorChangeMsg change ->
             case ( change.characterDataMutations, change.selection ) of
-                ( Just textChanges, Just (Selection selection) ) ->
+                ( Just textChanges, Just selection ) ->
                     ( model, Cmd.none )
                         |> andThen (editLine textChanges selection)
                         |> andThen (moveCursorColBy 1)
@@ -203,7 +203,11 @@ update msg model =
         PasteMsg val ->
             ( model, Cmd.none )
 
-        CaretMsg val ->
+        SelectionChange val ->
+            let
+                _ =
+                    Debug.log "SelectionChange" val
+            in
             ( model, Cmd.none )
 
         Scroll scroll ->
@@ -560,14 +564,14 @@ rippleBuffer model =
     )
 
 
-editLine : List TextChange -> Contents -> Model -> ( Model, Cmd Msg )
+editLine : List TextChange -> Selection -> Model -> ( Model, Cmd Msg )
 editLine textChanges selection model =
     let
-        editedModel =
+        modifyCharAt charOffset =
             List.foldl
                 (\textChange accum ->
                     case
-                        Tuple.mapSecond (String.toList >> List.drop (selection.focusOffset - 1) >> List.head) textChange
+                        Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
                     of
                         ( _ :: row :: _, Just char ) ->
                             if row == model.cursor.row then
@@ -588,7 +592,23 @@ editLine textChanges selection model =
                 model
                 textChanges
     in
-    ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
+    case selection of
+        NoSelection ->
+            ( model, Cmd.none )
+
+        Range { focusOffset } ->
+            let
+                editedModel =
+                    modifyCharAt focusOffset
+            in
+            ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
+
+        Collapsed { offset } ->
+            let
+                editedModel =
+                    modifyCharAt offset
+            in
+            ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
 
 
 insertChar : Char -> Model -> ( Model, Cmd Msg )
@@ -774,7 +794,7 @@ viewContent model =
             , HE.on "editorchange" editorChangeDecoder
             , HE.on "beforeinput" beforeInputDecoder
             , HE.on "pastewithdata" pasteWithDataDecoder
-            , HE.on "caretposition" caretPositionDecoder
+            , HE.on "editorselectionchange" selectionChangeDecoder
             ]
             [ keyedViewLines model
             , H.node "selection-state"
@@ -858,15 +878,17 @@ type alias EditorChange =
 
 
 type Selection
-    = Selection Contents
-
-
-type alias Contents =
-    { anchorOffset : Int
-    , anchorNode : Path
-    , focusOffset : Int
-    , focusNode : Path
-    }
+    = NoSelection
+    | Collapsed
+        { offset : Int
+        , node : Path
+        }
+    | Range
+        { anchorOffset : Int
+        , anchorNode : Path
+        , focusOffset : Int
+        , focusNode : Path
+        }
 
 
 type alias TextChange =
@@ -910,12 +932,22 @@ selectionDecoder =
 
 range : Path -> Int -> Path -> Int -> Selection
 range aNode aOffset fNode fOffset =
-    Selection
+    Range
         { anchorOffset = aOffset
         , anchorNode = aNode
         , focusOffset = fOffset
         , focusNode = fNode
         }
+
+
+
+-- Selection change events.
+
+
+selectionChangeDecoder : Decode.Decoder Msg
+selectionChangeDecoder =
+    Decode.at [ "detail" ] selectionDecoder
+        |> Decode.map SelectionChange
 
 
 
@@ -1030,26 +1062,6 @@ pasteWithDataDecoder =
         |> andMap (Decode.at [ "detail", "text" ] Decode.string)
         |> andMap (Decode.at [ "detail", "html" ] Decode.string)
         |> Decode.map PasteMsg
-
-
-
--- Caret events
-
-
-type alias CaretPosition =
-    { index : Int
-    , x : Float
-    , y : Float
-    }
-
-
-caretPositionDecoder : Decoder Msg
-caretPositionDecoder =
-    Decode.succeed CaretPosition
-        |> andMap (Decode.at [ "detail", "index" ] Decode.int)
-        |> andMap (Decode.at [ "detail", "x" ] Decode.float)
-        |> andMap (Decode.at [ "detail", "y" ] Decode.float)
-        |> Decode.map CaretMsg
 
 
 
