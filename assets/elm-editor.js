@@ -1,7 +1,7 @@
-
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
-    return ["selection"];
+    //return ["selection"];
+    return ['cursorrow', 'cursorcol'];
   }
 
   constructor() {
@@ -10,31 +10,41 @@ class SelectionState extends HTMLElement {
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    if (name !== "selection") {
-      return;
-    }
-    let selectionObj = {};
-    for (let pair of newValue.split(",")) {
-      let splitPair = pair.split("=");
-      if (splitPair.length === 2) {
-        selectionObj[splitPair[0]] = splitPair[1]
-      }
-    }
+    switch (name) {
+      case 'selection':
+        let selectionObj = {};
+        for (let pair of newValue.split(",")) {
+          let splitPair = pair.split("=");
+          if (splitPair.length === 2) {
+            selectionObj[splitPair[0]] = splitPair[1]
+          }
+        }
 
-    let focusOffset = Number(selectionObj["focus-offset"]);
-    const focusNode = this.findNodeFromPath(selectionObj["focus-node"]);
-    let anchorOffset = Number(selectionObj["anchor-offset"]);
-    const anchorNode = this.findNodeFromPath(selectionObj["anchor-node"]);
+        let focusOffset = Number(selectionObj["focus-offset"]);
+        const focusNode = this.findNodeFromPath(selectionObj["focus-node"]);
+        let anchorOffset = Number(selectionObj["anchor-offset"]);
+        const anchorNode = this.findNodeFromPath(selectionObj["anchor-node"]);
 
-    if (focusNode && anchorNode) {
-      const sel = document.getSelection();
+        if (focusNode && anchorNode) {
+          const sel = document.getSelection();
 
-      anchorOffset = adjustOffsetReverse(anchorNode, anchorOffset);
-      focusOffset = adjustOffsetReverse(focusNode, focusOffset);
-      try {
-        sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
-      } catch (e) {
-      }
+          anchorOffset = adjustOffsetReverse(anchorNode, anchorOffset);
+          focusOffset = adjustOffsetReverse(focusNode, focusOffset);
+          try {
+            sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
+          } catch (e) {}
+        }
+        break;
+
+      case 'cursorrow':
+        this.cursorrow = newValue;
+        setCaretPos(this.parentNode, this.cursorrow, this.cursorcol);
+        break;
+
+      case 'cursorcol':
+        this.cursorcol = newValue;
+        setCaretPos(this.parentNode, this.cursorrow, this.cursorcol);
+        break;
     }
   }
 
@@ -100,10 +110,6 @@ class ElmEditor extends HTMLElement {
     this.dispatchInit = this.dispatchInit.bind(this);
   }
 
-  static get observedAttributes() {
-    return ['cursorrow'];
-  }
-
   compositionStart() {
     this.composing = true;
 
@@ -135,19 +141,6 @@ class ElmEditor extends HTMLElement {
         this.dispatchEvent(newEvent);
       }
     }, 0)
-  }
-
-  attributeChangedCallback(name, oldValue, newValue) {
-    switch (name) {
-      case 'cursorrow':
-        this.cursorrow = newValue;
-        break;
-      case 'cursorcol':
-        this.cursorcol = newValue;
-        break;
-    }
-
-    setCaretPos(this, this.cursorrow, this.cursorcol);
   }
 
   connectedCallback() {

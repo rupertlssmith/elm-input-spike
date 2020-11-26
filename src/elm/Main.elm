@@ -680,7 +680,8 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
-        , Css.property "caret-color" "transparent"
+
+        --, Css.property "caret-color" "transparent"
         ]
     , Css.Global.class "content-line"
         [ Css.position Css.absolute
@@ -774,11 +775,13 @@ viewContent model =
             , HE.on "beforeinput" beforeInputDecoder
             , HE.on "pastewithdata" pasteWithDataDecoder
             , HE.on "caretposition" caretPositionDecoder
-            , HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
-            , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
             ]
             [ keyedViewLines model
-            , H.node "selection-state" [] []
+            , H.node "selection-state"
+                [ HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
+                , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
+                ]
+                []
             ]
         ]
 
