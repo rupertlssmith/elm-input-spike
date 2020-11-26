@@ -79,12 +79,23 @@ class SelectionState extends HTMLElement {
     }
     const anchorOffset = adjustOffset(selectionObj.anchorNode, selectionObj.anchorOffset);
     const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
+
+    if (selectionObj.isCollapsed) {
+      console.log("isCollapsed");
+    return {
+      "selectionExists": true,
+      "offset": focusOffset,
+      "node": focusPath,
+    }
+    }
+    else {
     return {
       "selectionExists": true,
       "anchorOffset": anchorOffset,
       "focusOffset": focusOffset,
       "anchorNode": anchorPath,
       "focusNode": focusPath,
+    }
     }
   }
 
