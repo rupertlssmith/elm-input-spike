@@ -12,28 +12,7 @@ class SelectionState extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     switch (name) {
       case 'selection':
-        let selectionObj = {};
-        for (let pair of newValue.split(",")) {
-          let splitPair = pair.split("=");
-          if (splitPair.length === 2) {
-            selectionObj[splitPair[0]] = splitPair[1]
-          }
-        }
-
-        let focusOffset = Number(selectionObj["focus-offset"]);
-        const focusNode = this.findNodeFromPath(selectionObj["focus-node"]);
-        let anchorOffset = Number(selectionObj["anchor-offset"]);
-        const anchorNode = this.findNodeFromPath(selectionObj["anchor-node"]);
-
-        if (focusNode && anchorNode) {
-          const sel = document.getSelection();
-
-          anchorOffset = adjustOffsetReverse(anchorNode, anchorOffset);
-          focusOffset = adjustOffsetReverse(focusNode, focusOffset);
-          try {
-            sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
-          } catch (e) {}
-        }
+        setSelection;
         break;
 
       case 'cursorrow':
@@ -64,38 +43,66 @@ class SelectionState extends HTMLElement {
     return findNodeFromPath(path, this.parentNode)
   }
 
-  getSelectionObject() {
-    const selection = {
-      "selectionExists": false
-    };
-    const selectionObj = getSelection();
-    if (!selectionObj) {
-      return selection
+  setSelection() {
+    let selectionObj = {};
+    for (let pair of newValue.split(",")) {
+      let splitPair = pair.split("=");
+      if (splitPair.length === 2) {
+        selectionObj[splitPair[0]] = splitPair[1]
+      }
     }
-    const anchorPath = this.getSelectionPath(selectionObj.anchorNode, selectionObj.anchorOffset);
-    const focusPath = this.getSelectionPath(selectionObj.focusNode, selectionObj.focusOffset);
-    if (!anchorPath || !focusPath) {
-      return selection
-    }
-    const anchorOffset = adjustOffset(selectionObj.anchorNode, selectionObj.anchorOffset);
-    const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
 
-    if (selectionObj.isCollapsed) {
-      console.log("isCollapsed");
-    return {
-      "selectionExists": true,
-      "offset": focusOffset,
-      "node": focusPath,
+    let focusOffset = Number(selectionObj["focus-offset"]);
+    const focusNode = this.findNodeFromPath(selectionObj["focus-node"]);
+    let anchorOffset = Number(selectionObj["anchor-offset"]);
+    const anchorNode = this.findNodeFromPath(selectionObj["anchor-node"]);
+
+    if (focusNode && anchorNode) {
+      const sel = document.getSelection();
+
+      anchorOffset = adjustOffsetReverse(anchorNode, anchorOffset);
+      focusOffset = adjustOffsetReverse(focusNode, focusOffset);
+      try {
+        sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
+      } catch (e) {}
     }
+  }
+
+  getSelectionObject() {
+    const noSelection = { "selectionExists": false };
+    const selectionObj = getSelection();
+
+    if (!selectionObj)
+    {
+      return noSelection;
     }
-    else {
-    return {
-      "selectionExists": true,
-      "anchorOffset": anchorOffset,
-      "focusOffset": focusOffset,
-      "anchorNode": anchorPath,
-      "focusNode": focusPath,
+    else if (selectionObj.isCollapsed)
+    {
+      const focusPath = this.getSelectionPath(selectionObj.focusNode, selectionObj.focusOffset);
+      if (!focusPath) { return noSelection; }
+      const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
+
+      return {
+        "selectionExists": true,
+        "offset": focusOffset,
+        "node": focusPath,
+      }
     }
+    else
+    {
+      const anchorPath = this.getSelectionPath(selectionObj.anchorNode, selectionObj.anchorOffset);
+      const focusPath = this.getSelectionPath(selectionObj.focusNode, selectionObj.focusOffset);
+      if (!anchorPath || !focusPath) { return noSelection; }
+      const anchorOffset = adjustOffset(selectionObj.anchorNode, selectionObj.anchorOffset);
+      const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
+
+      return {
+        "selectionExists": true,
+        "anchorOffset": anchorOffset,
+        "focusOffset": focusOffset,
+        "anchorNode": anchorPath,
+        "focusNode": focusPath,
+      }
     }
   }
 
