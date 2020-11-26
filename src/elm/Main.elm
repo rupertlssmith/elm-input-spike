@@ -190,10 +190,10 @@ update msg model =
                 _ =
                     Debug.log "EditorChangeMsg" change
             in
-            case ( change.characterDataMutations, change.selection ) of
-                ( Just textChanges, Just selection ) ->
+            case change.characterDataMutations of
+                Just textChanges ->
                     ( model, Cmd.none )
-                        |> andThen (editLine textChanges selection)
+                        |> andThen (editLine textChanges change.selection)
                         |> andThen (moveCursorColBy 1)
                         |> andThen rippleBuffer
                         |> andThen activity
@@ -874,7 +874,7 @@ initDecoder =
 
 type alias EditorChange =
     { root : Decode.Value
-    , selection : Maybe Selection
+    , selection : Selection
     , characterDataMutations : Maybe (List TextChange)
     , timestamp : Int
     , isComposing : Bool
@@ -907,7 +907,7 @@ editorChangeDecoder : Decode.Decoder Msg
 editorChangeDecoder =
     Decode.succeed EditorChange
         |> andMap (Decode.at [ "detail", "root" ] Decode.value)
-        |> andMap (Decode.at [ "detail", "selection" ] (Decode.maybe selectionDecoder))
+        |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
         |> andMap (Decode.maybe (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder))
         |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
         |> andMap (Decode.at [ "detail", "isComposing" ] (Decode.oneOf [ Decode.bool, Decode.succeed False ]))
@@ -925,11 +925,24 @@ characterDataMutationsDecoder =
 
 selectionDecoder : Decode.Decoder Selection
 selectionDecoder =
-    Decode.succeed range
-        |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
-        |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
-        |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
-        |> andMap (Decode.at [ "focusOffset" ] Decode.int)
+    Decode.at [ "selectionExists" ] Decode.bool
+        |> Decode.andThen
+            (\exists ->
+                if not exists then
+                    Decode.succeed NoSelection
+
+                else
+                    Decode.oneOf
+                        [ Decode.succeed range
+                            |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
+                            |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "focusOffset" ] Decode.int)
+                        , Decode.succeed collapsed
+                            |> andMap (Decode.at [ "node" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "offset" ] Decode.int)
+                        ]
+            )
 
 
 range : Path -> Int -> Path -> Int -> Selection
@@ -956,24 +969,7 @@ collapsed fNode fOffset =
 
 selectionChangeDecoder : Decode.Decoder Msg
 selectionChangeDecoder =
-    Decode.at [ "detail", "selectionExists" ] Decode.bool
-        |> Decode.andThen
-            (\exists ->
-                if not exists then
-                    Decode.succeed NoSelection
-
-                else
-                    Decode.oneOf
-                        [ Decode.succeed range
-                            |> andMap (Decode.at [ "detail", "anchorNode" ] (Decode.list Decode.int))
-                            |> andMap (Decode.at [ "detail", "anchorOffset" ] Decode.int)
-                            |> andMap (Decode.at [ "detail", "focusNode" ] (Decode.list Decode.int))
-                            |> andMap (Decode.at [ "detail", "focusOffset" ] Decode.int)
-                        , Decode.succeed collapsed
-                            |> andMap (Decode.at [ "detail", "node" ] (Decode.list Decode.int))
-                            |> andMap (Decode.at [ "detail", "offset" ] Decode.int)
-                        ]
-            )
+    Decode.at [ "detail" ] selectionDecoder
         |> Decode.map SelectionChange
 
 
