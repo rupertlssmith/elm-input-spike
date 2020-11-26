@@ -155,7 +155,7 @@ type Msg
     | EditorChangeMsg EditorChange
     | InputMsg InputEvent
     | PasteMsg PasteEvent
-    | SelectionChange (Maybe Selection)
+    | SelectionChange Selection
     | Scroll ScrollEvent
     | RandomBuffer (TextBuffer Tag Tag)
     | ContentViewPort (Result Browser.Dom.Error Viewport)
@@ -186,6 +186,10 @@ update msg model =
             ( model, Cmd.none )
 
         EditorChangeMsg change ->
+            let
+                _ =
+                    Debug.log "EditorChangeMsg" change
+            in
             case ( change.characterDataMutations, change.selection ) of
                 ( Just textChanges, Just selection ) ->
                     ( model, Cmd.none )
@@ -903,7 +907,7 @@ editorChangeDecoder : Decode.Decoder Msg
 editorChangeDecoder =
     Decode.succeed EditorChange
         |> andMap (Decode.at [ "detail", "root" ] Decode.value)
-        |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
+        |> andMap (Decode.at [ "detail", "selection" ] (Decode.maybe selectionDecoder))
         |> andMap (Decode.maybe (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder))
         |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
         |> andMap (Decode.at [ "detail", "isComposing" ] (Decode.oneOf [ Decode.bool, Decode.succeed False ]))
@@ -919,15 +923,13 @@ characterDataMutationsDecoder =
         )
 
 
-selectionDecoder : Decode.Decoder (Maybe Selection)
+selectionDecoder : Decode.Decoder Selection
 selectionDecoder =
-    Decode.maybe
-        (Decode.succeed range
-            |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
-            |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
-            |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
-            |> andMap (Decode.at [ "focusOffset" ] Decode.int)
-        )
+    Decode.succeed range
+        |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
+        |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
+        |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
+        |> andMap (Decode.at [ "focusOffset" ] Decode.int)
 
 
 range : Path -> Int -> Path -> Int -> Selection
@@ -940,13 +942,38 @@ range aNode aOffset fNode fOffset =
         }
 
 
+collapsed : Path -> Int -> Selection
+collapsed fNode fOffset =
+    Collapsed
+        { offset = fOffset
+        , node = fNode
+        }
+
+
 
 -- Selection change events.
 
 
 selectionChangeDecoder : Decode.Decoder Msg
 selectionChangeDecoder =
-    Decode.at [ "detail" ] selectionDecoder
+    Decode.at [ "detail", "selectionExists" ] Decode.bool
+        |> Decode.andThen
+            (\exists ->
+                if not exists then
+                    Decode.succeed NoSelection
+
+                else
+                    Decode.oneOf
+                        [ Decode.succeed range
+                            |> andMap (Decode.at [ "detail", "anchorNode" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "detail", "anchorOffset" ] Decode.int)
+                            |> andMap (Decode.at [ "detail", "focusNode" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "detail", "focusOffset" ] Decode.int)
+                        , Decode.succeed collapsed
+                            |> andMap (Decode.at [ "detail", "node" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "detail", "offset" ] Decode.int)
+                        ]
+            )
         |> Decode.map SelectionChange
 
 
