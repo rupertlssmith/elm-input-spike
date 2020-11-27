@@ -802,8 +802,17 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-state"
-                [ HA.attribute "cursorrow" (String.fromInt (model.cursor.row - model.startLine))
-                , HA.attribute "cursorcol" (String.fromInt model.cursor.col)
+                [ HA.attribute "selection"
+                    ("focus-offset="
+                        ++ String.fromInt model.cursor.col
+                        ++ ",focus-node=[0,"
+                        ++ String.fromInt (model.cursor.row - model.startLine)
+                        ++ ",0,0],anchor-offset="
+                        ++ String.fromInt model.cursor.col
+                        ++ ",anchor-node=[0,"
+                        ++ String.fromInt (model.cursor.row - model.startLine)
+                        ++ ",0,0]"
+                    )
                 ]
                 []
             ]

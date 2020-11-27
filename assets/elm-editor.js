@@ -1,30 +1,11 @@
 class SelectionState extends HTMLElement {
   static get observedAttributes() {
-    //return ["selection"];
-    return ['cursorrow', 'cursorcol'];
+    return ["selection"];
   }
 
   constructor() {
     super();
     this.selectionChange = this.selectionChange.bind(this);
-  }
-
-  attributeChangedCallback(name, oldValue, newValue) {
-    switch (name) {
-      case 'selection':
-        setSelection;
-        break;
-
-      case 'cursorrow':
-        this.cursorrow = newValue;
-        setCaretPos(this.parentNode, this.cursorrow, this.cursorcol);
-        break;
-
-      case 'cursorcol':
-        this.cursorcol = newValue;
-        setCaretPos(this.parentNode, this.cursorrow, this.cursorcol);
-        break;
-    }
   }
 
   connectedCallback() {
@@ -35,6 +16,23 @@ class SelectionState extends HTMLElement {
     document.removeEventListener("selectionchange", this.selectionChange)
   }
 
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch (name) {
+      case 'selection':
+        console.log(newValue);
+        this.setSelection(newValue);
+        break;
+    }
+  }
+
+  selectionChange(e) {
+    let selection = this.getSelectionObject(e);
+    let event = new CustomEvent("editorselectionchange", {
+      detail: selection
+    });
+    this.parentNode.dispatchEvent(event);
+  };
+
   getSelectionPath(node, offset) {
     return getSelectionPath(node, this.parentNode, offset)
   }
@@ -43,7 +41,7 @@ class SelectionState extends HTMLElement {
     return findNodeFromPath(path, this.parentNode)
   }
 
-  setSelection() {
+  setSelection(newValue) {
     let selectionObj = {};
     for (let pair of newValue.split(",")) {
       let splitPair = pair.split("=");
@@ -105,14 +103,6 @@ class SelectionState extends HTMLElement {
       }
     }
   }
-
-  selectionChange(e) {
-    let selection = this.getSelectionObject(e);
-    let event = new CustomEvent("editorselectionchange", {
-      detail: selection
-    });
-    this.parentNode.dispatchEvent(event);
-  };
 }
 
 class ElmEditor extends HTMLElement {
@@ -362,18 +352,4 @@ let adjustOffset = (node, offset) => {
   }
 
   return offset;
-};
-
-function setCaretPos(element, row, col) {
-  var selection = window.getSelection();
-
-  var range = document.createRange();
-  node = findNodeFromPath([0, row, 0, 0], element);
-
-  if (!!node) {
-    range.setStart(node, col);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
 };
