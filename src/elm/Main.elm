@@ -778,8 +778,7 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-state"
-                [ rowColToSelection { cursor | row = cursor.row - model.startLine }
-                    |> HA.attribute "selection"
+                [ cursorToSelection model |> HA.attribute "selection"
                 ]
                 []
             ]
@@ -828,6 +827,29 @@ viewLine row line =
         content
 
 
+cursorToSelection : Model -> String
+cursorToSelection model =
+    let
+        rowcol =
+            model.cursor
+
+        linePath =
+            [ 0, model.cursor.row ]
+
+        cursorPath =
+            TextBuffer.getLine model.cursor.row model.buffer
+    in
+    "focus-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",focus-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0,anchor-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",anchor-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0"
+
+
 
 -- Selection change events.
 
@@ -866,19 +888,6 @@ collapsed fNode fOffset =
         { offset = fOffset
         , node = fNode
         }
-
-
-rowColToSelection : RowCol -> String
-rowColToSelection rowcol =
-    "focus-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",focus-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0,anchor-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",anchor-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0"
 
 
 selectionChangeDecoder : Decode.Decoder Msg
