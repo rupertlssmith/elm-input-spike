@@ -852,10 +852,28 @@ cursorToSelection model =
 
 lineToPathOffset : Int -> TextBuffer.Line tag ctx -> ( Path, Int )
 lineToPathOffset col line =
-    List.foldl
-        (\_ accum -> accum)
-        ( [], 0 )
-        line.tagged
+    let
+        { path, offset } =
+            listToPathOffsetInner
+                line.tagged
+                { path = 0
+                , offset = 0
+                , rem = col
+                }
+
+        listToPathOffsetInner taggedStrings accum =
+            case taggedStrings of
+                [] ->
+                    accum
+
+                ( _, string ) :: moreTaggedStrings ->
+                    if accum.rem <= String.length string then
+                        accum
+
+                    else
+                        accum
+    in
+    ( [ path, 0 ], offset )
 
 
 
