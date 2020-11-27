@@ -805,13 +805,13 @@ viewContent model =
                 [ HA.attribute "selection"
                     ("focus-offset="
                         ++ String.fromInt model.cursor.col
-                        ++ ",focus-node=[0,"
+                        ++ ",focus-node=0:"
                         ++ String.fromInt (model.cursor.row - model.startLine)
-                        ++ ",0,0],anchor-offset="
+                        ++ ":0:0,anchor-offset="
                         ++ String.fromInt model.cursor.col
-                        ++ ",anchor-node=[0,"
+                        ++ ",anchor-node=0:"
                         ++ String.fromInt (model.cursor.row - model.startLine)
-                        ++ ",0,0]"
+                        ++ ":0:0"
                     )
                 ]
                 []

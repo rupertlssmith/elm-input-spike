@@ -54,6 +54,10 @@ class SelectionState extends HTMLElement {
     const focusNode = this.findNodeFromPath(selectionObj["focus-node"]);
     let anchorOffset = Number(selectionObj["anchor-offset"]);
     const anchorNode = this.findNodeFromPath(selectionObj["anchor-node"]);
+    console.log(focusOffset);
+    console.log(focusNode);
+    console.log(anchorOffset);
+    console.log(anchorNode);
 
     if (focusNode && anchorNode) {
       const sel = document.getSelection();
@@ -316,6 +320,7 @@ const findNodeFromPath = (path, editor) => {
 
   if (typeof path === "string") {
     path = path.split(":").map((v) => Number(v));
+    console.log(path);
   }
 
   let node = editor;
