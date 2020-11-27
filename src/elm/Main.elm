@@ -183,6 +183,10 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         InitMsg val ->
+            let
+                _ =
+                    Debug.log "InitMsg" val
+            in
             ( model, Cmd.none )
 
         EditorChangeMsg change ->
@@ -202,9 +206,17 @@ update msg model =
                     ( model, Cmd.none )
 
         InputMsg val ->
+            let
+                _ =
+                    Debug.log "InputMsg" val
+            in
             ( model, Cmd.none )
 
         PasteMsg val ->
+            let
+                _ =
+                    Debug.log "PasteMsg" val
+            in
             ( model, Cmd.none )
 
         SelectionChange val ->
@@ -787,6 +799,10 @@ viewCursor model =
 
 viewContent : Model -> Html Msg
 viewContent model =
+    let
+        cursor =
+            model.cursor
+    in
     H.div
         [ HA.id "content-main"
         , HA.style "height" (String.fromFloat model.bufferHeight ++ "px")
@@ -802,21 +818,25 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-state"
-                [ HA.attribute "selection"
-                    ("focus-offset="
-                        ++ String.fromInt model.cursor.col
-                        ++ ",focus-node=0:"
-                        ++ String.fromInt (model.cursor.row - model.startLine)
-                        ++ ":0:0,anchor-offset="
-                        ++ String.fromInt model.cursor.col
-                        ++ ",anchor-node=0:"
-                        ++ String.fromInt (model.cursor.row - model.startLine)
-                        ++ ":0:0"
-                    )
+                [ rowColToSelection { cursor | row = cursor.row - model.startLine }
+                    |> HA.attribute "selection"
                 ]
                 []
             ]
         ]
+
+
+rowColToSelection : RowCol -> String
+rowColToSelection rowcol =
+    "focus-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",focus-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0,anchor-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",anchor-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0"
 
 
 keyedViewLines : Model -> Html Msg

@@ -1,4 +1,72 @@
+class ElmEditor extends HTMLElement {
+
+  constructor() {
+    super();
+
+    this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
+    this._observer = new MutationObserver(this.mutationObserverCallback);
+  }
+
+  connectedCallback() {
+    this._observer.observe(this, {
+      characterDataOldValue: true,
+      attributeOldValue: false,
+      attributes: true,
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    this.initInterval = setInterval(this.dispatchInit, 1000)
+  }
+
+  disconnectedCallback() {
+    this._observer.disconnect();
+  }
+
+  characterDataMutations(mutationsList) {
+    if (!mutationsList) {
+      return null;
+    }
+
+    let mutations = [];
+
+    for (let mutation of mutationsList) {
+      if (mutation.type !== "characterData") {
+        return null;
+      }
+      mutations.push({
+        path: getSelectionPath(mutation.target, this, 0),
+        text: mutation.target.nodeValue
+      });
+    }
+
+    return mutations;
+  }
+
+  mutationObserverCallback(mutationsList, _) {
+    const element = this.querySelector('[data-rte-main="true"]');
+    const selection = getSelection(this);
+
+    const characterDataMutations = this.characterDataMutations(mutationsList);
+
+    if (!!characterDataMutations) {
+      const event = new CustomEvent("editorchange", {
+        detail: {
+          root: element,
+          selection: selection,
+          isComposing: this.composing,
+          characterDataMutations: characterDataMutations,
+          timestamp: (new Date()).getTime()
+        }
+      });
+
+      this.dispatchEvent(event);
+    }
+  };
+}
+
 class SelectionState extends HTMLElement {
+
   static get observedAttributes() {
     return ["selection"];
   }
@@ -19,248 +87,94 @@ class SelectionState extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     switch (name) {
       case 'selection':
-        console.log(newValue);
-        this.setSelection(newValue);
+        setSelection(this.parentNode, newValue);
         break;
     }
   }
 
   selectionChange(e) {
-    let selection = this.getSelectionObject(e);
+    let selection = getSelection(this.parentNode);
     let event = new CustomEvent("editorselectionchange", {
       detail: selection
     });
+
     this.parentNode.dispatchEvent(event);
   };
-
-  getSelectionPath(node, offset) {
-    return getSelectionPath(node, this.parentNode, offset)
-  }
-
-  findNodeFromPath(path) {
-    return findNodeFromPath(path, this.parentNode)
-  }
-
-  setSelection(newValue) {
-    let selectionObj = {};
-    for (let pair of newValue.split(",")) {
-      let splitPair = pair.split("=");
-      if (splitPair.length === 2) {
-        selectionObj[splitPair[0]] = splitPair[1]
-      }
-    }
-
-    let focusOffset = Number(selectionObj["focus-offset"]);
-    const focusNode = this.findNodeFromPath(selectionObj["focus-node"]);
-    let anchorOffset = Number(selectionObj["anchor-offset"]);
-    const anchorNode = this.findNodeFromPath(selectionObj["anchor-node"]);
-    console.log(focusOffset);
-    console.log(focusNode);
-    console.log(anchorOffset);
-    console.log(anchorNode);
-
-    if (focusNode && anchorNode) {
-      const sel = document.getSelection();
-
-      anchorOffset = adjustOffsetReverse(anchorNode, anchorOffset);
-      focusOffset = adjustOffsetReverse(focusNode, focusOffset);
-      try {
-        sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
-      } catch (e) {}
-    }
-  }
-
-  getSelectionObject() {
-    const noSelection = { "selectionExists": false };
-    const selectionObj = getSelection();
-
-    if (!selectionObj)
-    {
-      return noSelection;
-    }
-    else if (selectionObj.isCollapsed)
-    {
-      const focusPath = this.getSelectionPath(selectionObj.focusNode, selectionObj.focusOffset);
-      if (!focusPath) { return noSelection; }
-      const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
-
-      return {
-        "selectionExists": true,
-        "offset": focusOffset,
-        "node": focusPath,
-      }
-    }
-    else
-    {
-      const anchorPath = this.getSelectionPath(selectionObj.anchorNode, selectionObj.anchorOffset);
-      const focusPath = this.getSelectionPath(selectionObj.focusNode, selectionObj.focusOffset);
-      if (!anchorPath || !focusPath) { return noSelection; }
-      const anchorOffset = adjustOffset(selectionObj.anchorNode, selectionObj.anchorOffset);
-      const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
-
-      return {
-        "selectionExists": true,
-        "anchorOffset": anchorOffset,
-        "focusOffset": focusOffset,
-        "anchorNode": anchorPath,
-        "focusNode": focusPath,
-      }
-    }
-  }
-}
-
-class ElmEditor extends HTMLElement {
-
-  constructor() {
-    super();
-    this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
-    this.pasteCallback = this.pasteCallback.bind(this);
-    this._observer = new MutationObserver(this.mutationObserverCallback);
-    this.addEventListener("paste", this.pasteCallback);
-    this.addEventListener("compositionstart", this.compositionStart.bind(this));
-    this.addEventListener("compositionend", this.compositionEnd.bind(this));
-    this.dispatchInit = this.dispatchInit.bind(this);
-  }
-
-  compositionStart() {
-    this.composing = true;
-
-    if (isAndroid()) {
-      if (this.lastCompositionTimeout) {
-        clearTimeout(this.lastCompositionTimeout);
-      }
-      const lastCompositionTimeout = setTimeout(() => {
-        if (this.composing && lastCompositionTimeout === this.lastCompositionTimeout) {
-          this.composing = false;
-          const newEvent = new CustomEvent("editorcompositionend", {
-            detail: {}
-          });
-          this.dispatchEvent(newEvent);
-        }
-      }, 5000);
-      this.lastCompositionTimeout = lastCompositionTimeout
-    }
-  }
-
-  compositionEnd() {
-    this.composing = false;
-
-    setTimeout(() => {
-      if (!this.composing) {
-        const newEvent = new CustomEvent("editorcompositionend", {
-          detail: {}
-        });
-        this.dispatchEvent(newEvent);
-      }
-    }, 0)
-  }
-
-  connectedCallback() {
-    this._observer.observe(this, {
-      characterDataOldValue: true,
-      attributeOldValue: false,
-      attributes: true,
-      childList: true,
-      subtree: true,
-      characterData: true
-    });
-    this.initInterval = setInterval(this.dispatchInit, 1000)
-  }
-
-  disconnectedCallback() {
-    this._observer.disconnect();
-  }
-
-  pasteCallback(e) {
-    e.preventDefault();
-
-    const clipboardData = e.clipboardData || window.clipboardData;
-    const text = clipboardData.getData('text') || "";
-    const html = clipboardData.getData('text/html') || "";
-    const newEvent = new CustomEvent("pastewithdata", {
-      detail: {
-        text: text,
-        html: html
-      }
-    });
-    this.dispatchEvent(newEvent);
-  }
-
-  caretCallback(e) {
-    if (this.contains(event.target)) {
-      const index = getCaretIndex(this);
-      const coord = getCaretCoordinates();
-      const newEvent = new CustomEvent("caretposition", {
-        detail: {
-          index: index,
-          x: coord.x,
-          y: coord.y
-        }
-      });
-      this.dispatchEvent(newEvent);
-    }
-  }
-
-  characterDataMutations(mutationsList) {
-    if (!mutationsList) {
-      return null;
-    }
-
-    let mutations = [];
-    for (let mutation of mutationsList) {
-      if (mutation.type !== "characterData") {
-        return null;
-      }
-      mutations.push({
-        path: getSelectionPath(mutation.target, this, 0),
-        text: mutation.target.nodeValue
-      });
-    }
-    return mutations;
-  }
-
-  mutationObserverCallback(mutationsList, _) {
-    const element = this.querySelector('[data-rte-main="true"]');
-    const selection = this.childNodes[1].getSelectionObject();
-
-    const characterDataMutations = this.characterDataMutations(mutationsList);
-    if (!!characterDataMutations) {
-      const event = new CustomEvent("editorchange", {
-        detail: {
-          root: element,
-          selection: selection,
-          isComposing: this.composing,
-          characterDataMutations: characterDataMutations,
-          timestamp: (new Date()).getTime()
-        }
-      });
-      this.dispatchEvent(event);
-    }
-  };
-
-  dispatchInit() {
-    if (!this.isConnected) {
-      return;
-    }
-    const isMacLike = /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
-    const event = new CustomEvent("editorinit", {
-      detail: {
-        shortKey: isMacLike ? "Meta" : "Control"
-      }
-    });
-    this.dispatchEvent(event);
-    clearInterval(this.initInterval)
-  }
 }
 
 customElements.define('elm-editor', ElmEditor);
 customElements.define('selection-state', SelectionState);
 
-const zeroWidthSpace = "\u200B";
+let getSelection = (node) => {
+  const noSelection = {
+    "selectionExists": false
+  };
+  const selectionObj = document.getSelection();
 
-const isAndroid = () => {
-  return /(android)/i.test(navigator.userAgent);
-};
+  if (!selectionObj) {
+    return noSelection;
+  } else if (selectionObj.isCollapsed) {
+    const focusPath = getSelectionPath(selectionObj.focusNode, node, selectionObj.focusOffset)
+
+    if (!focusPath) {
+      return noSelection;
+    }
+
+    const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
+
+    return {
+      "selectionExists": true,
+      "offset": focusOffset,
+      "node": focusPath,
+    }
+  } else {
+    const anchorPath = getSelectionPath(selectionObj.anchorNode, node, selectionObj.anchorOffset)
+    const focusPath = getSelectionPath(selectionObj.focusNode, node, selectionObj.focusOffset)
+
+    if (!anchorPath || !focusPath) {
+      return noSelection;
+    }
+
+    const anchorOffset = adjustOffset(selectionObj.anchorNode, selectionObj.anchorOffset);
+    const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
+
+    return {
+      "selectionExists": true,
+      "anchorOffset": anchorOffset,
+      "focusOffset": focusOffset,
+      "anchorNode": anchorPath,
+      "focusNode": focusPath,
+    }
+  }
+}
+
+let setSelection = (node, selectionDesc) => {
+  let selectionObj = {};
+
+  for (let pair of selectionDesc.split(",")) {
+    let splitPair = pair.split("=");
+    if (splitPair.length === 2) {
+      selectionObj[splitPair[0]] = splitPair[1]
+    }
+  }
+
+  let focusOffset = Number(selectionObj["focus-offset"]);
+  const focusNode = findNodeFromPath(selectionObj["focus-node"], node)
+  let anchorOffset = Number(selectionObj["anchor-offset"]);
+  const anchorNode = findNodeFromPath(selectionObj["anchor-node"], node)
+
+  if (focusNode && anchorNode) {
+    const sel = document.getSelection();
+
+    anchorOffset = adjustOffsetReverse(anchorNode, anchorOffset);
+    focusOffset = adjustOffsetReverse(focusNode, focusOffset);
+
+    try {
+      sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
+    } catch (e) {}
+  }
+}
+
 
 const getSelectionPath = (node, editor, offset) => {
   const originalNode = node;
@@ -320,7 +234,6 @@ const findNodeFromPath = (path, editor) => {
 
   if (typeof path === "string") {
     path = path.split(":").map((v) => Number(v));
-    console.log(path);
   }
 
   let node = editor;
@@ -333,6 +246,8 @@ const findNodeFromPath = (path, editor) => {
 
   return node || null;
 };
+
+const zeroWidthSpace = "\u200B";
 
 let adjustOffsetReverse = (node, offset) => {
   if (node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace) {
