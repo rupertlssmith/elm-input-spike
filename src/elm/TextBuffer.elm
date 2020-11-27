@@ -1,21 +1,27 @@
-module TextBuffer exposing (..)
+module TextBuffer exposing
+    ( TextBuffer, empty, fromArray
+    , breakLine, deleteCharAt, deleteCharBefore, insertCharAt
+    , getLine
+    , lastColumn, lastLine
+    , Line, TagLineFn, length, refocus, rippleTo
+    )
 
 {-| An editing buffer.
 
 
 # Buffers and ways to make one.
 
-@docs TextBuffer, fromString, fromList
+@docs TextBuffer, empty, fromArray, fromString, fromList
 
 
 # Make changes to a buffers contents.
 
-@docs breakLine, deleteCharAfter, deleteCharBefore, insertCharAt
+@docs breakLine, deleteCharAt, deleteCharBefore, insertCharAt
 
 
 # Get the contents from a buffer.
 
-@docs range, charAt, contents
+@docs getLine
 
 
 # Iterate over the buffer contents.
@@ -25,8 +31,8 @@ module TextBuffer exposing (..)
 
 # Query size and position information.
 
-@docs isFirstLine, isFirstColumn, isLastLine, isLastColumn
 @docs lastColumn, lastLine, nextLine, previousLine, numLines, clampColumn
+@docs isFirstLine, isFirstColumn, isLastLine, isLastColumn
 
 -}
 
