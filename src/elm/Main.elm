@@ -151,10 +151,7 @@ subscriptions _ =
 
 
 type Msg
-    = InitMsg InitEvent
-    | EditorChangeMsg EditorChange
-    | InputMsg InputEvent
-    | PasteMsg PasteEvent
+    = EditorChangeMsg EditorChange
     | SelectionChange Selection
     | Scroll ScrollEvent
     | RandomBuffer (TextBuffer Tag Tag)
@@ -182,13 +179,6 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        InitMsg val ->
-            let
-                _ =
-                    Debug.log "InitMsg" val
-            in
-            ( model, Cmd.none )
-
         EditorChangeMsg change ->
             let
                 _ =
@@ -204,20 +194,6 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
-
-        InputMsg val ->
-            let
-                _ =
-                    Debug.log "InputMsg" val
-            in
-            ( model, Cmd.none )
-
-        PasteMsg val ->
-            let
-                _ =
-                    Debug.log "PasteMsg" val
-            in
-            ( model, Cmd.none )
 
         SelectionChange val ->
             let
@@ -810,10 +786,7 @@ viewContent model =
         ]
         [ viewCursors model
         , H.node "elm-editor"
-            [ HE.on "editorinit" initDecoder
-            , HE.on "editorchange" editorChangeDecoder
-            , HE.on "beforeinput" beforeInputDecoder
-            , HE.on "pastewithdata" pasteWithDataDecoder
+            [ HE.on "editorchange" editorChangeDecoder
             , HE.on "editorselectionchange" selectionChangeDecoder
             ]
             [ keyedViewLines model
@@ -824,19 +797,6 @@ viewContent model =
                 []
             ]
         ]
-
-
-rowColToSelection : RowCol -> String
-rowColToSelection rowcol =
-    "focus-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",focus-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0,anchor-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",anchor-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0"
 
 
 keyedViewLines : Model -> Html Msg
@@ -879,22 +839,6 @@ viewLine row line =
         , HA.style "top" (String.fromFloat (toFloat row * config.lineHeight) ++ "px")
         ]
         content
-
-
-
--- Editor initialisation events.
-
-
-type alias InitEvent =
-    { shortKey : String
-    }
-
-
-initDecoder : Decoder Msg
-initDecoder =
-    Decode.succeed InitEvent
-        |> andMap (Decode.at [ "detail", "shortKey" ] Decode.string)
-        |> Decode.map InitMsg
 
 
 
@@ -996,6 +940,19 @@ collapsed fNode fOffset =
 -- Selection change events.
 
 
+rowColToSelection : RowCol -> String
+rowColToSelection rowcol =
+    "focus-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",focus-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0,anchor-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",anchor-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0"
+
+
 selectionChangeDecoder : Decode.Decoder Msg
 selectionChangeDecoder =
     Decode.at [ "detail" ] selectionDecoder
@@ -1079,26 +1036,6 @@ keyToMsg keyEvent =
 
 
 
--- Editor input events.
-
-
-type alias InputEvent =
-    { data : Maybe String
-    , isComposing : Bool
-    , inputType : String
-    }
-
-
-beforeInputDecoder : Decoder Msg
-beforeInputDecoder =
-    Decode.succeed InputEvent
-        |> andMap (Decode.maybe (Decode.field "data" Decode.string))
-        |> andMap (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
-        |> andMap (Decode.field "inputType" Decode.string)
-        |> Decode.map InputMsg
-
-
-
 -- Editor paste events.
 
 
@@ -1108,12 +1045,11 @@ type alias PasteEvent =
     }
 
 
-pasteWithDataDecoder : Decoder Msg
+pasteWithDataDecoder : Decoder PasteEvent
 pasteWithDataDecoder =
     Decode.succeed PasteEvent
         |> andMap (Decode.at [ "detail", "text" ] Decode.string)
         |> andMap (Decode.at [ "detail", "html" ] Decode.string)
-        |> Decode.map PasteMsg
 
 
 
