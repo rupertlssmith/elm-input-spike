@@ -850,6 +850,14 @@ cursorToSelection model =
         ++ ":0:0"
 
 
+lineToPathOffset : Int -> TextBuffer.Line tag ctx -> ( Path, Int )
+lineToPathOffset col line =
+    List.foldl
+        (\_ accum -> accum)
+        ( [], 0 )
+        line.tagged
+
+
 
 -- Selection change events.
 
