@@ -184,16 +184,11 @@ update msg model =
                 _ =
                     Debug.log "EditorChangeMsg" change
             in
-            case change.characterDataMutations of
-                Just textChanges ->
-                    ( model, Cmd.none )
-                        |> andThen (editLine textChanges change.selection)
-                        |> andThen (moveCursorColBy 1)
-                        |> andThen rippleBuffer
-                        |> andThen activity
-
-                _ ->
-                    ( model, Cmd.none )
+            ( model, Cmd.none )
+                |> andThen (editLine change.characterDataMutations change.selection)
+                |> andThen (moveCursorColBy 1)
+                |> andThen rippleBuffer
+                |> andThen activity
 
         SelectionChange val ->
             let
@@ -842,16 +837,7 @@ viewLine row line =
 
 
 
--- Editor mutation events.
-
-
-type alias EditorChange =
-    { root : Decode.Value
-    , selection : Selection
-    , characterDataMutations : Maybe (List TextChange)
-    , timestamp : Int
-    , isComposing : Bool
-    }
+-- Selection change events.
 
 
 type Selection
@@ -868,32 +854,45 @@ type Selection
         }
 
 
-type alias TextChange =
-    ( Path, String )
-
-
 type alias Path =
     List Int
 
 
-editorChangeDecoder : Decode.Decoder Msg
-editorChangeDecoder =
-    Decode.succeed EditorChange
-        |> andMap (Decode.at [ "detail", "root" ] Decode.value)
-        |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
-        |> andMap (Decode.maybe (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder))
-        |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
-        |> andMap (Decode.at [ "detail", "isComposing" ] (Decode.oneOf [ Decode.bool, Decode.succeed False ]))
-        |> Decode.map EditorChangeMsg
+range : Path -> Int -> Path -> Int -> Selection
+range aNode aOffset fNode fOffset =
+    Range
+        { anchorOffset = aOffset
+        , anchorNode = aNode
+        , focusOffset = fOffset
+        , focusNode = fNode
+        }
 
 
-characterDataMutationsDecoder : Decode.Decoder (List TextChange)
-characterDataMutationsDecoder =
-    Decode.list
-        (Decode.map2 Tuple.pair
-            (Decode.field "path" (Decode.list Decode.int))
-            (Decode.field "text" Decode.string)
-        )
+collapsed : Path -> Int -> Selection
+collapsed fNode fOffset =
+    Collapsed
+        { offset = fOffset
+        , node = fNode
+        }
+
+
+rowColToSelection : RowCol -> String
+rowColToSelection rowcol =
+    "focus-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",focus-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0,anchor-offset="
+        ++ String.fromInt rowcol.col
+        ++ ",anchor-node=0:"
+        ++ String.fromInt rowcol.row
+        ++ ":0:0"
+
+
+selectionChangeDecoder : Decode.Decoder Msg
+selectionChangeDecoder =
+    Decode.at [ "detail" ] selectionDecoder
+        |> Decode.map SelectionChange
 
 
 selectionDecoder : Decode.Decoder Selection
@@ -918,45 +917,41 @@ selectionDecoder =
             )
 
 
-range : Path -> Int -> Path -> Int -> Selection
-range aNode aOffset fNode fOffset =
-    Range
-        { anchorOffset = aOffset
-        , anchorNode = aNode
-        , focusOffset = fOffset
-        , focusNode = fNode
-        }
+
+-- Editor mutation events.
 
 
-collapsed : Path -> Int -> Selection
-collapsed fNode fOffset =
-    Collapsed
-        { offset = fOffset
-        , node = fNode
-        }
+type alias EditorChange =
+    { root : Decode.Value
+    , selection : Selection
+    , characterDataMutations : List TextChange
+    , timestamp : Int
+    , isComposing : Bool
+    }
 
 
-
--- Selection change events.
-
-
-rowColToSelection : RowCol -> String
-rowColToSelection rowcol =
-    "focus-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",focus-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0,anchor-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",anchor-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0"
+type alias TextChange =
+    ( Path, String )
 
 
-selectionChangeDecoder : Decode.Decoder Msg
-selectionChangeDecoder =
-    Decode.at [ "detail" ] selectionDecoder
-        |> Decode.map SelectionChange
+editorChangeDecoder : Decode.Decoder Msg
+editorChangeDecoder =
+    Decode.succeed EditorChange
+        |> andMap (Decode.at [ "detail", "root" ] Decode.value)
+        |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
+        |> andMap (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder)
+        |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
+        |> andMap (Decode.at [ "detail", "isComposing" ] (Decode.oneOf [ Decode.bool, Decode.succeed False ]))
+        |> Decode.map EditorChangeMsg
+
+
+characterDataMutationsDecoder : Decode.Decoder (List TextChange)
+characterDataMutationsDecoder =
+    Decode.list
+        (Decode.map2 Tuple.pair
+            (Decode.field "path" (Decode.list Decode.int))
+            (Decode.field "text" Decode.string)
+        )
 
 
 
