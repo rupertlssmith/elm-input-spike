@@ -151,12 +151,12 @@ subscriptions _ =
 
 
 type Msg
-    = EditorChangeMsg EditorChange
-    | SelectionChange Selection
-    | Scroll ScrollEvent
-    | RandomBuffer (TextBuffer Tag Tag)
+    = RandomBuffer (TextBuffer Tag Tag)
     | ContentViewPort (Result Browser.Dom.Error Viewport)
     | Resize
+    | EditorChange EditorChangeEvent
+    | SelectionChange Selection
+    | Scroll ScrollEvent
     | MoveUp
     | MoveDown
     | MoveLeft
@@ -179,7 +179,23 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        EditorChangeMsg change ->
+        RandomBuffer buffer ->
+            ( { model | buffer = buffer }, Cmd.none )
+
+        ContentViewPort result ->
+            case result of
+                Ok viewport ->
+                    ( model, Cmd.none )
+                        |> andThen (establishViewport viewport)
+                        |> andThen calcViewableRegion
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Resize ->
+            ( model, initEditorSize )
+
+        EditorChange change ->
             ( model, Cmd.none )
                 |> andThen (editLine change.characterDataMutations change.selection)
                 |> andThen (moveCursorColBy 1)
@@ -197,22 +213,6 @@ update msg model =
             , Cmd.none
             )
                 |> andThen calcViewableRegion
-
-        RandomBuffer buffer ->
-            ( { model | buffer = buffer }, Cmd.none )
-
-        ContentViewPort result ->
-            case result of
-                Ok viewport ->
-                    ( model, Cmd.none )
-                        |> andThen (establishViewport viewport)
-                        |> andThen calcViewableRegion
-
-                _ ->
-                    ( model, Cmd.none )
-
-        Resize ->
-            ( model, initEditorSize )
 
         MoveUp ->
             ( model, Cmd.none )
@@ -913,7 +913,7 @@ selectionDecoder =
 -- Editor mutation events.
 
 
-type alias EditorChange =
+type alias EditorChangeEvent =
     { root : Decode.Value
     , selection : Selection
     , characterDataMutations : List TextChange
@@ -928,13 +928,13 @@ type alias TextChange =
 
 editorChangeDecoder : Decode.Decoder Msg
 editorChangeDecoder =
-    Decode.succeed EditorChange
+    Decode.succeed EditorChangeEvent
         |> andMap (Decode.at [ "detail", "root" ] Decode.value)
         |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
         |> andMap (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder)
         |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
         |> andMap (Decode.at [ "detail", "isComposing" ] (Decode.oneOf [ Decode.bool, Decode.succeed False ]))
-        |> Decode.map EditorChangeMsg
+        |> Decode.map EditorChange
 
 
 characterDataMutationsDecoder : Decode.Decoder (List TextChange)
@@ -1062,45 +1062,6 @@ scrollDecoder =
 
 
 
--- Event hooks
--- onCompositionStart : (Message -> msg) -> Html.Attribute msg
--- onCompositionStart msgFunc =
---     Html.Events.on "compositionstart" (D.map msgFunc (D.succeed CompositionStart))
---
---
--- onCompositionEnd : (Message -> msg) -> Html.Attribute msg
--- onCompositionEnd msgFunc =
---     Html.Events.on "editorcompositionend" (D.map msgFunc (D.succeed CompositionEnd))
---
---
--- onPasteWithData : (Message -> msg) -> Html.Attribute msg
--- onPasteWithData msgFunc =
---     Html.Events.on "pastewithdata" (D.map msgFunc pasteWithDataDecoder)
---
---
--- onCut : (Message -> msg) -> Html.Attribute msg
--- onCut msgFunc =
---     Html.Events.on "cut" (D.map msgFunc (D.succeed CutEvent))
---
---
--- onInit : (Message -> msg) -> Html.Attribute msg
--- onInit msgFunc =
---     Html.Events.on "editorinit" (D.map msgFunc initDecoder)
---
---
--- onEditorSelectionChange : (Message -> msg) -> Html.Attribute msg
--- onEditorSelectionChange msgFunc =
---     Html.Events.on "editorselectionchange" (D.map msgFunc editorSelectionChangeDecoder)
---
---
--- onBeforeInput : Tagger msg -> CommandMap -> Spec -> Editor -> Html.Attribute msg
--- onBeforeInput tagger commandMap_ spec_ editor_ =
---     Html.Events.preventDefaultOn "beforeinput" (BeforeInput.preventDefaultOnBeforeInputDecoder tagger commandMap_ spec_ editor_)
---
---
--- onKeyDown : Tagger msg -> CommandMap -> Spec -> Editor -> Html.Attribute msg
--- onKeyDown tagger commandMap_ spec_ editor_ =
---     Html.Events.preventDefaultOn "keydown" (KeyDown.preventDefaultOnKeyDownDecoder tagger commandMap_ spec_ editor_)
 -- Random buffer initialization.
 
 
