@@ -180,10 +180,6 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         EditorChangeMsg change ->
-            let
-                _ =
-                    Debug.log "EditorChangeMsg" change
-            in
             ( model, Cmd.none )
                 |> andThen (editLine change.characterDataMutations change.selection)
                 |> andThen (moveCursorColBy 1)
@@ -191,10 +187,6 @@ update msg model =
                 |> andThen activity
 
         SelectionChange val ->
-            let
-                _ =
-                    Debug.log "SelectionChange" val
-            in
             ( model, Cmd.none )
 
         Scroll scroll ->
