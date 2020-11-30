@@ -157,6 +157,10 @@ type Msg
     | EditorChange EditorChangeEvent
     | SelectionChange Selection
     | Scroll ScrollEvent
+    | StartSelecting
+    | StopSelecting
+    | GoToHoveredPosition
+    | Hover
     | MoveUp
     | MoveDown
     | MoveLeft
@@ -213,6 +217,18 @@ update msg model =
             , Cmd.none
             )
                 |> andThen calcViewableRegion
+
+        StartSelecting ->
+            ( model, Cmd.none )
+
+        StopSelecting ->
+            ( model, Cmd.none )
+
+        GoToHoveredPosition ->
+            ( model, Cmd.none )
+
+        Hover ->
+            ( model, Cmd.none )
 
         MoveUp ->
             ( model, Cmd.none )
