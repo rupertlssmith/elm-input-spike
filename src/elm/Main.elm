@@ -54,6 +54,7 @@ type alias Model =
     , top : Float
     , height : Float
     , cursor : RowCol
+    , hover : HoverPos
     , scrollRow : Int
     , targetCol : Int
     , linesPerPage : Int
@@ -74,11 +75,18 @@ type alias RowCol =
     }
 
 
+type HoverPos
+    = NoHover
+    | HoverLine Int
+    | HoverChar RowCol
+
+
 init _ =
     ( { buffer = TextBuffer.empty initialCtx tagLineFn
       , top = 0
       , height = 0
       , cursor = { row = 0, col = 0 }
+      , hover = NoHover
       , scrollRow = 0
       , targetCol = 0
       , linesPerPage = 0
@@ -160,7 +168,7 @@ type Msg
     | StartSelecting
     | StopSelecting
     | GoToHoveredPosition
-    | Hover
+    | Hover HoverPos
     | MoveUp
     | MoveDown
     | MoveLeft
@@ -224,11 +232,13 @@ update msg model =
         StopSelecting ->
             ( model, Cmd.none )
 
+        Hover hover ->
+            ( { model | hover = hover }, Cmd.none )
+                |> andThen sanitizeHover
+
         GoToHoveredPosition ->
             ( model, Cmd.none )
-
-        Hover ->
-            ( model, Cmd.none )
+                |> andThen cursorToHover
 
         MoveUp ->
             ( model, Cmd.none )
@@ -509,6 +519,52 @@ scrollIfNecessary model =
     ( { model | scrollRow = newScrollRow }
     , scrollCmd
     )
+
+
+sanitizeHover : Model -> ( Model, Cmd Msg )
+sanitizeHover model =
+    let
+        hover =
+            case model.hover of
+                NoHover ->
+                    model.hover
+
+                HoverLine line ->
+                    HoverLine (clamp 0 (TextBuffer.lastLine model.buffer) line)
+
+                HoverChar { row, col } ->
+                    let
+                        sanitizedRow =
+                            clamp 0 (TextBuffer.lastLine model.buffer) row
+
+                        sanitizedColumn =
+                            clamp 0 (TextBuffer.lastColumn model.buffer sanitizedRow) col
+                    in
+                    HoverChar
+                        { row = sanitizedRow
+                        , col = sanitizedColumn
+                        }
+    in
+    ( { model | hover = hover }, Cmd.none )
+
+
+cursorToHover : Model -> ( Model, Cmd Msg )
+cursorToHover model =
+    let
+        cursor =
+            case model.hover of
+                NoHover ->
+                    model.cursor
+
+                HoverLine row ->
+                    { row = row
+                    , col = TextBuffer.lastColumn model.buffer row
+                    }
+
+                HoverChar position ->
+                    position
+    in
+    ( { model | cursor = cursor }, Cmd.none )
 
 
 establishViewport : Viewport -> Model -> ( Model, Cmd Msg )
