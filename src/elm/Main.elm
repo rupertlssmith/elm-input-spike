@@ -838,40 +838,60 @@ cursorToSelection model =
 
         cursorPath =
             TextBuffer.getLine model.cursor.row model.buffer
+                |> Maybe.map (lineToPathOffset model.cursor.col)
+                |> Maybe.map (Tuple.mapFirst (List.append linePath))
+                |> Maybe.map pathOffsetToSelection
+                |> Maybe.withDefault (pathOffsetToSelection ( [ 0, 0, 0 ], 0 ))
+    in
+    cursorPath
+
+
+pathOffsetToSelection : ( Path, Int ) -> String
+pathOffsetToSelection ( path, offset ) =
+    let
+        pathString =
+            List.map String.fromInt path |> List.intersperse ":" |> String.concat
+
+        offsetString =
+            String.fromInt offset
     in
     "focus-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",focus-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0,anchor-offset="
-        ++ String.fromInt rowcol.col
-        ++ ",anchor-node=0:"
-        ++ String.fromInt rowcol.row
-        ++ ":0:0"
+        ++ String.fromInt offset
+        ++ ",focus-node="
+        ++ pathString
+        ++ ",anchor-offset="
+        ++ String.fromInt offset
+        ++ ",anchor-node="
+        ++ pathString
 
 
 lineToPathOffset : Int -> TextBuffer.Line tag ctx -> ( Path, Int )
 lineToPathOffset col line =
     let
         { path, offset } =
-            listToPathOffsetInner
+            lineToPathOffsetInner
                 line.tagged
                 { path = 0
                 , offset = 0
                 , rem = col
                 }
 
-        listToPathOffsetInner taggedStrings accum =
+        lineToPathOffsetInner taggedStrings accum =
             case taggedStrings of
                 [] ->
                     accum
 
                 ( _, string ) :: moreTaggedStrings ->
-                    if accum.rem <= String.length string then
-                        accum
+                    let
+                        strlen =
+                            String.length string
+                    in
+                    if accum.rem <= strlen then
+                        { path = accum.path, offset = accum.rem, rem = 0 }
 
                     else
-                        accum
+                        lineToPathOffsetInner moreTaggedStrings
+                            { path = accum.path + 1, offset = 0, rem = accum.rem - strlen }
     in
     ( [ path, 0 ], offset )
 
