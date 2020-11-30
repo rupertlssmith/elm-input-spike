@@ -5,6 +5,7 @@ class ElmEditor extends HTMLElement {
 
     this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
     this._observer = new MutationObserver(this.mutationObserverCallback);
+    this.addEventListener("click", this.caretCallback.bind(this));
   }
 
   connectedCallback() {
@@ -62,7 +63,20 @@ class ElmEditor extends HTMLElement {
 
       this.dispatchEvent(event);
     }
-  };
+  }
+
+  caretCallback(e) {
+    if (this.contains(event.target)) {
+      const selection = getSelection(this);
+
+      const newEvent = new CustomEvent("mouseselection", {
+        detail: selection
+      });
+
+      this.dispatchEvent(newEvent);
+    }
+  }
+
 }
 
 class SelectionState extends HTMLElement {
@@ -93,6 +107,7 @@ class SelectionState extends HTMLElement {
   }
 
   selectionChange(e) {
+    console.log(e);
     let selection = getSelection(this.parentNode);
     let event = new CustomEvent("editorselectionchange", {
       detail: selection

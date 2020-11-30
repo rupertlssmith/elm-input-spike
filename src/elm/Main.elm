@@ -164,6 +164,7 @@ type Msg
     | Resize
     | EditorChange EditorChangeEvent
     | SelectionChange Selection
+    | MouseSelectionChange Selection
     | Scroll ScrollEvent
     | StartSelecting
     | StopSelecting
@@ -215,6 +216,17 @@ update msg model =
                 |> andThen activity
 
         SelectionChange val ->
+            let
+                _ =
+                    Debug.log "SelectionChange" val
+            in
+            ( model, Cmd.none )
+
+        MouseSelectionChange val ->
+            let
+                _ =
+                    Debug.log "MouseSelectionChange" val
+            in
             ( model, Cmd.none )
 
         Scroll scroll ->
@@ -847,6 +859,7 @@ viewContent model =
         , H.node "elm-editor"
             [ HE.on "editorchange" editorChangeDecoder
             , HE.on "editorselectionchange" selectionChangeDecoder
+            , HE.on "mouseselection" (Decode.at [ "detail" ] selectionDecoder |> Decode.map MouseSelectionChange)
             ]
             [ keyedViewLines model
             , H.node "selection-state"
@@ -1186,6 +1199,21 @@ scrollDecoder =
         |> andMap (Decode.at [ "target", "scrollLeft" ] Decode.float)
         |> andMap (Decode.at [ "target", "scrollWidth" ] Decode.float)
         |> Decode.map Scroll
+
+
+
+-- Mouse events.
+
+
+onHover : RowCol -> Attribute Msg
+onHover position =
+    HE.custom "mouseover"
+        (Decode.succeed
+            { message = Hover (HoverChar position)
+            , stopPropagation = True
+            , preventDefault = True
+            }
+        )
 
 
 
