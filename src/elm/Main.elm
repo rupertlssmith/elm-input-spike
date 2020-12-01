@@ -165,7 +165,7 @@ type Msg
     | ContentViewPort (Result Browser.Dom.Error Viewport)
     | Resize
     | EditorChange EditorChangeEvent
-    | SelectionChange Selection
+    | SelectionChange Selection Bool
     | MouseSelectionChange Selection
     | Scroll ScrollEvent
     | StartSelecting
@@ -217,9 +217,25 @@ update msg model =
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        SelectionChange val ->
-            ( { model | trackingCursor = selectionToRowCol model val }, Cmd.none )
-                |> andThen activity
+        SelectionChange val ctrlEvent ->
+            let
+                _ =
+                    Debug.log "SelectionChange" (SelectionChange val ctrlEvent)
+            in
+            if ctrlEvent then
+                let
+                    cursorPos =
+                        selectionToRowCol model val
+
+                    _ =
+                        Debug.log "SelectionChange" "setting control cursor"
+                in
+                ( { model | trackingCursor = cursorPos, controlCursor = cursorPos }, Cmd.none )
+                    |> andThen activity
+
+            else
+                ( { model | trackingCursor = selectionToRowCol model val }, Cmd.none )
+                    |> andThen activity
 
         MouseSelectionChange val ->
             let
@@ -862,7 +878,7 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-state"
-                [ cursorToSelection model |> HA.attribute "selection"
+                [ cursorToSelection model |> Debug.log "cursorToSelection" |> HA.attribute "selection"
                 ]
                 []
             ]
@@ -918,10 +934,6 @@ selectionToRowCol model sel =
             { row = 0, col = 0 }
 
         Collapsed { node, offset } ->
-            let
-                _ =
-                    Debug.log "Collapsed" { node = node, offset = offset }
-            in
             case node of
                 _ :: row :: child :: _ ->
                     let
@@ -1063,8 +1075,9 @@ collapsed fNode fOffset =
 
 selectionChangeDecoder : Decode.Decoder Msg
 selectionChangeDecoder =
-    Decode.at [ "detail" ] selectionDecoder
-        |> Decode.map SelectionChange
+    Decode.succeed SelectionChange
+        |> andMap (Decode.at [ "detail" ] selectionDecoder)
+        |> andMap (Decode.at [ "detail", "mousedown" ] Decode.bool)
 
 
 selectionDecoder : Decode.Decoder Selection
