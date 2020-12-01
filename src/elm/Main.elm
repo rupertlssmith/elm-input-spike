@@ -218,11 +218,8 @@ update msg model =
                 |> andThen activity
 
         SelectionChange val ->
-            let
-                _ =
-                    Debug.log "SelectionChange" val
-            in
-            ( model, Cmd.none )
+            ( { model | trackingCursor = selectionToRowCol model val }, Cmd.none )
+                |> andThen activity
 
         MouseSelectionChange val ->
             let
@@ -912,6 +909,47 @@ viewLine row line =
         , HA.style "top" (String.fromFloat (toFloat row * config.lineHeight) ++ "px")
         ]
         content
+
+
+selectionToRowCol : Model -> Selection -> RowCol
+selectionToRowCol model sel =
+    case sel of
+        NoSelection ->
+            { row = 0, col = 0 }
+
+        Collapsed { node, offset } ->
+            let
+                _ =
+                    Debug.log "Collapsed" { node = node, offset = offset }
+            in
+            case node of
+                _ :: row :: child :: _ ->
+                    let
+                        col =
+                            TextBuffer.getLine row model.buffer
+                                |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
+                                |> Maybe.withDefault 0
+                    in
+                    { row = row, col = col }
+
+                _ ->
+                    { row = 0, col = 0 }
+
+        Range _ ->
+            { row = 0, col = 0 }
+
+
+pathOffsetToCol : Int -> Int -> List ( tag, String ) -> Int
+pathOffsetToCol child offset line =
+    case ( child, line ) of
+        ( 0, _ ) ->
+            offset
+
+        ( _, [] ) ->
+            offset
+
+        ( _, tl :: tls ) ->
+            pathOffsetToCol (child - 1) (offset + String.length (Tuple.second tl)) tls
 
 
 cursorToSelection : Model -> String

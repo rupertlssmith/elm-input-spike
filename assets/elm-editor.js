@@ -107,7 +107,6 @@ class SelectionState extends HTMLElement {
   }
 
   selectionChange(e) {
-    console.log(e);
     let selection = getSelection(this.parentNode);
     let event = new CustomEvent("editorselectionchange", {
       detail: selection
