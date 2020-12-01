@@ -53,7 +53,7 @@ type alias Model =
     { buffer : TextBuffer Tag Tag
     , top : Float
     , height : Float
-    , cursor : RowCol
+    , controlCursor : RowCol
     , hover : HoverPos
     , scrollRow : Int
     , targetCol : Int
@@ -85,7 +85,7 @@ init _ =
     ( { buffer = TextBuffer.empty initialCtx tagLineFn
       , top = 0
       , height = 0
-      , cursor = { row = 0, col = 0 }
+      , controlCursor = { row = 0, col = 0 }
       , hover = NoHover
       , scrollRow = 0
       , targetCol = 0
@@ -270,7 +270,7 @@ update msg model =
         MoveLeft ->
             let
                 lastColPrevRow =
-                    TextBuffer.lastColumn model.buffer (model.cursor.row - 1)
+                    TextBuffer.lastColumn model.buffer (model.controlCursor.row - 1)
             in
             ( model, Cmd.none )
                 |> andThen (cursorLeft lastColPrevRow)
@@ -303,14 +303,14 @@ update msg model =
 
         LineHome ->
             ( model, Cmd.none )
-                |> andThen (moveCursorColBy -model.cursor.col)
+                |> andThen (moveCursorColBy -model.controlCursor.col)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
 
         LineEnd ->
             ( model, Cmd.none )
-                |> andThen (moveCursorColBy (TextBuffer.lastColumn model.buffer model.cursor.row - model.cursor.col))
+                |> andThen (moveCursorColBy (TextBuffer.lastColumn model.buffer model.controlCursor.row - model.controlCursor.col))
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
@@ -349,7 +349,7 @@ update msg model =
         RemoveCharBefore ->
             let
                 lastColPrevRow =
-                    TextBuffer.lastColumn model.buffer (model.cursor.row - 1)
+                    TextBuffer.lastColumn model.buffer (model.controlCursor.row - 1)
             in
             ( model, Cmd.none )
                 |> andThen backspace
@@ -371,7 +371,7 @@ update msg model =
             ( model, Cmd.none )
                 |> andThen newline
                 |> andThen (moveCursorRowBy 1)
-                |> andThen (moveCursorColBy -model.cursor.col)
+                |> andThen (moveCursorColBy -model.controlCursor.col)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
@@ -403,7 +403,7 @@ andThen fn ( model, cmd ) =
 moveTo : RowCol -> Model -> ( Model, Cmd Msg )
 moveTo pos model =
     ( { model
-        | cursor = pos
+        | controlCursor = pos
         , targetCol = pos.col
       }
     , Cmd.none
@@ -417,14 +417,14 @@ moveCursorRowBy val model =
             clamp
                 0
                 (TextBuffer.lastLine model.buffer)
-                (model.cursor.row + val)
+                (model.controlCursor.row + val)
 
         newCol =
             clamp 0
                 (TextBuffer.lastColumn model.buffer newRow)
-                (max model.cursor.col model.targetCol)
+                (max model.controlCursor.col model.targetCol)
     in
-    ( { model | cursor = { row = newRow, col = newCol } }
+    ( { model | controlCursor = { row = newRow, col = newCol } }
     , Cmd.none
     )
 
@@ -434,11 +434,11 @@ moveCursorColBy val model =
     let
         newCol =
             clamp 0
-                (TextBuffer.lastColumn model.buffer model.cursor.row)
-                (model.cursor.col + val)
+                (TextBuffer.lastColumn model.buffer model.controlCursor.row)
+                (model.controlCursor.col + val)
     in
     ( { model
-        | cursor = { row = model.cursor.row, col = newCol }
+        | controlCursor = { row = model.controlCursor.row, col = newCol }
         , targetCol = newCol
       }
     , Cmd.none
@@ -449,20 +449,20 @@ cursorLeft : Int -> Model -> ( Model, Cmd Msg )
 cursorLeft lastColPrevRow model =
     let
         left =
-            model.cursor.col - 1
+            model.controlCursor.col - 1
 
         cursor =
-            if left < 0 && model.cursor.row <= 0 then
+            if left < 0 && model.controlCursor.row <= 0 then
                 { row = 0, col = 0 }
 
             else if left < 0 then
-                { row = model.cursor.row - 1, col = lastColPrevRow }
+                { row = model.controlCursor.row - 1, col = lastColPrevRow }
 
             else
-                { row = model.cursor.row, col = left }
+                { row = model.controlCursor.row, col = left }
     in
     ( { model
-        | cursor = cursor
+        | controlCursor = cursor
         , targetCol = cursor.col
       }
     , Cmd.none
@@ -473,23 +473,23 @@ cursorRight : Model -> ( Model, Cmd Msg )
 cursorRight model =
     let
         right =
-            model.cursor.col + 1
+            model.controlCursor.col + 1
 
         rightMost =
-            TextBuffer.lastColumn model.buffer model.cursor.row
+            TextBuffer.lastColumn model.buffer model.controlCursor.row
 
         cursor =
-            if right > rightMost && model.cursor.row >= (TextBuffer.length model.buffer - 1) then
-                model.cursor
+            if right > rightMost && model.controlCursor.row >= (TextBuffer.length model.buffer - 1) then
+                model.controlCursor
 
             else if right > rightMost then
-                { row = model.cursor.row + 1, col = 0 }
+                { row = model.controlCursor.row + 1, col = 0 }
 
             else
-                { row = model.cursor.row, col = right }
+                { row = model.controlCursor.row, col = right }
     in
     ( { model
-        | cursor = cursor
+        | controlCursor = cursor
         , targetCol = cursor.col
       }
     , Cmd.none
@@ -498,7 +498,7 @@ cursorRight model =
 
 refocusBuffer : Model -> ( Model, Cmd Msg )
 refocusBuffer model =
-    ( { model | buffer = TextBuffer.refocus model.cursor.row model.cursor.col model.buffer }
+    ( { model | buffer = TextBuffer.refocus model.controlCursor.row model.controlCursor.col model.buffer }
     , Cmd.none
     )
 
@@ -507,21 +507,21 @@ scrollIfNecessary : Model -> ( Model, Cmd Msg )
 scrollIfNecessary model =
     let
         ( newScrollRow, scrollCmd ) =
-            if model.cursor.row > (model.scrollRow + model.linesPerPage - 3) then
+            if model.controlCursor.row > (model.scrollRow + model.linesPerPage - 3) then
                 let
                     topRow =
                         min
                             (TextBuffer.lastLine model.buffer - model.linesPerPage + 1)
-                            (model.cursor.row - model.linesPerPage + 3)
+                            (model.controlCursor.row - model.linesPerPage + 3)
                 in
                 ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight - model.bottomOffset) )
 
-            else if model.cursor.row < (model.scrollRow + 2) then
+            else if model.controlCursor.row < (model.scrollRow + 2) then
                 let
                     topRow =
                         max
                             0
-                            (model.cursor.row - 2)
+                            (model.controlCursor.row - 2)
                 in
                 ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight) )
 
@@ -566,7 +566,7 @@ cursorToHover model =
         cursor =
             case model.hover of
                 NoHover ->
-                    model.cursor
+                    model.controlCursor
 
                 HoverLine row ->
                     { row = row
@@ -576,7 +576,7 @@ cursorToHover model =
                 HoverChar position ->
                     position
     in
-    ( { model | cursor = cursor }, Cmd.none )
+    ( { model | controlCursor = cursor }, Cmd.none )
 
 
 establishViewport : Viewport -> Model -> ( Model, Cmd Msg )
@@ -608,7 +608,7 @@ calcViewableRegion model =
             (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
 
         cursorIndex =
-            model.cursor.col
+            model.controlCursor.col
     in
     ( { model
         | startLine = startLine
@@ -637,12 +637,12 @@ editLine textChanges selection model =
                         Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
                     of
                         ( _ :: row :: _, Just char ) ->
-                            if row == model.cursor.row then
+                            if row == model.controlCursor.row then
                                 { accum
                                     | buffer =
                                         TextBuffer.insertCharAt char
-                                            model.cursor.row
-                                            model.cursor.col
+                                            model.controlCursor.row
+                                            model.controlCursor.col
                                             accum.buffer
                                 }
 
@@ -676,28 +676,28 @@ editLine textChanges selection model =
 
 insertChar : Char -> Model -> ( Model, Cmd Msg )
 insertChar char model =
-    ( { model | buffer = TextBuffer.insertCharAt char model.cursor.row model.cursor.col model.buffer }
+    ( { model | buffer = TextBuffer.insertCharAt char model.controlCursor.row model.controlCursor.col model.buffer }
     , Cmd.none
     )
 
 
 newline : Model -> ( Model, Cmd Msg )
 newline model =
-    ( { model | buffer = TextBuffer.breakLine model.cursor.row model.cursor.col model.buffer }
+    ( { model | buffer = TextBuffer.breakLine model.controlCursor.row model.controlCursor.col model.buffer }
     , Cmd.none
     )
 
 
 backspace : Model -> ( Model, Cmd Msg )
 backspace model =
-    ( { model | buffer = TextBuffer.deleteCharBefore model.cursor.row model.cursor.col model.buffer }
+    ( { model | buffer = TextBuffer.deleteCharBefore model.controlCursor.row model.controlCursor.col model.buffer }
     , Cmd.none
     )
 
 
 delete : Model -> ( Model, Cmd Msg )
 delete model =
-    ( { model | buffer = TextBuffer.deleteCharAt model.cursor.row model.cursor.col model.buffer }
+    ( { model | buffer = TextBuffer.deleteCharAt model.controlCursor.row model.controlCursor.col model.buffer }
     , Cmd.none
     )
 
@@ -830,11 +830,11 @@ viewCursor model =
     let
         top =
             String.fromFloat
-                (toFloat model.cursor.row * config.lineHeight)
+                (toFloat model.controlCursor.row * config.lineHeight)
                 ++ "px"
 
         left =
-            String.fromInt model.cursor.col ++ "ch"
+            String.fromInt model.controlCursor.col ++ "ch"
     in
     H.div
         [ HA.class "cursor"
@@ -848,7 +848,7 @@ viewContent : Model -> Html Msg
 viewContent model =
     let
         cursor =
-            model.cursor
+            model.controlCursor
     in
     H.div
         [ HA.id "content-main"
@@ -880,7 +880,7 @@ keyedViewLines model =
                         accum
 
                     Just row ->
-                        if model.cursor.row == idx then
+                        if model.controlCursor.row == idx then
                             ( "edit-" ++ String.fromInt model.editKey, viewLine idx row ) :: accum
 
                         else
@@ -916,14 +916,14 @@ cursorToSelection : Model -> String
 cursorToSelection model =
     let
         rowcol =
-            model.cursor
+            model.controlCursor
 
         linePath =
-            [ 0, model.cursor.row ]
+            [ 0, model.controlCursor.row ]
 
         cursorPath =
-            TextBuffer.getLine model.cursor.row model.buffer
-                |> Maybe.map (lineToPathOffset model.cursor.col)
+            TextBuffer.getLine model.controlCursor.row model.buffer
+                |> Maybe.map (lineToPathOffset model.controlCursor.col)
                 |> Maybe.map (Tuple.mapFirst (List.append linePath))
                 |> Maybe.map pathOffsetToSelection
                 |> Maybe.withDefault (pathOffsetToSelection ( [ 0, 0, 0 ], 0 ))
