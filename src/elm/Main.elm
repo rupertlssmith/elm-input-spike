@@ -54,6 +54,7 @@ type alias Model =
     , top : Float
     , height : Float
     , controlCursor : RowCol
+    , trackingCursor : RowCol
     , hover : HoverPos
     , scrollRow : Int
     , targetCol : Int
@@ -86,6 +87,7 @@ init _ =
       , top = 0
       , height = 0
       , controlCursor = { row = 0, col = 0 }
+      , trackingCursor = { row = 0, col = 0 }
       , hover = NoHover
       , scrollRow = 0
       , targetCol = 0
@@ -830,11 +832,11 @@ viewCursor model =
     let
         top =
             String.fromFloat
-                (toFloat model.controlCursor.row * config.lineHeight)
+                (toFloat model.trackingCursor.row * config.lineHeight)
                 ++ "px"
 
         left =
-            String.fromInt model.controlCursor.col ++ "ch"
+            String.fromInt model.trackingCursor.col ++ "ch"
     in
     H.div
         [ HA.class "cursor"
