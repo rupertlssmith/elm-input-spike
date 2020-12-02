@@ -115,9 +115,22 @@ class SelectionHandler extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     switch (name) {
       case 'selection':
+        console.log("Selection attribute changed: " + newValue);
         setSelection(this.parentNode, newValue);
         break;
     }
+  }
+
+  set selection(newValue) {
+    if (JSON.stringify(this.sel) === JSON.stringify(newValue)) {
+    } else {
+      console.log("Selection property changed: " + JSON.stringify(newValue));
+      this.sel = newValue;
+    }
+  }
+
+  get selection() {
+    return this.sel;
   }
 }
 

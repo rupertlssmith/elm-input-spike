@@ -14,6 +14,7 @@ import Html.Keyed as Keyed
 import Html.Lazy
 import Html.Styled
 import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 import Random exposing (Generator, Seed)
 import Random.Array
 import Regex exposing (Regex)
@@ -886,7 +887,8 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-handler"
-                [ cursorToSelection model |> HA.attribute "selection"
+                [ cursorToSelectionAttr model |> HA.attribute "selection"
+                , cursorToSelectionProperty model |> HA.property "selection"
                 ]
                 []
             ]
@@ -935,6 +937,10 @@ viewLine row line =
         content
 
 
+
+-- Coordinate conversion.
+
+
 selectionToRowCol : Model -> Selection -> RowCol
 selectionToRowCol model sel =
     case sel of
@@ -972,8 +978,8 @@ pathOffsetToCol child offset line =
             pathOffsetToCol (child - 1) (offset + String.length (Tuple.second tl)) tls
 
 
-cursorToSelection : Model -> String
-cursorToSelection model =
+cursorToSelectionAttr : Model -> String
+cursorToSelectionAttr model =
     let
         rowcol =
             model.controlCursor
@@ -987,6 +993,25 @@ cursorToSelection model =
                 |> Maybe.map (Tuple.mapFirst (List.append linePath))
                 |> Maybe.map pathOffsetToSelection
                 |> Maybe.withDefault (pathOffsetToSelection ( [ 0, 0, 0 ], 0 ))
+    in
+    cursorPath
+
+
+cursorToSelectionProperty : Model -> Encode.Value
+cursorToSelectionProperty model =
+    let
+        rowcol =
+            model.controlCursor
+
+        linePath =
+            [ 0, model.controlCursor.row - model.startLine ]
+
+        cursorPath =
+            TextBuffer.getLine model.controlCursor.row model.buffer
+                |> Maybe.map (lineToPathOffset model.controlCursor.col)
+                |> Maybe.map (Tuple.mapFirst (List.append linePath))
+                |> Maybe.map (\( node, offset ) -> selectionEncoder (Collapsed { node = node, offset = offset }))
+                |> Maybe.withDefault (selectionEncoder NoSelection)
     in
     cursorPath
 
@@ -1117,6 +1142,28 @@ selectionDecoder =
                             |> andMap (Decode.at [ "offset" ] Decode.int)
                         ]
             )
+
+
+selectionEncoder : Selection -> Encode.Value
+selectionEncoder sel =
+    case sel of
+        NoSelection ->
+            [ ( "selectionExists", Encode.bool False ) ]
+                |> Encode.object
+
+        Collapsed val ->
+            [ ( "node", Encode.list Encode.int val.node )
+            , ( "offset", Encode.int val.offset )
+            ]
+                |> Encode.object
+
+        Range val ->
+            [ ( "anchorNode", Encode.list Encode.int val.anchorNode )
+            , ( "anchorOffset", Encode.int val.anchorOffset )
+            , ( "focusNode", Encode.list Encode.int val.focusNode )
+            , ( "focusOffset", Encode.int val.focusOffset )
+            ]
+                |> Encode.object
 
 
 
