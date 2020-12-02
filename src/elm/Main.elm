@@ -230,7 +230,8 @@ update msg model =
                     _ =
                         Debug.log "SelectionChange" "setting control cursor"
                 in
-                ( { model | trackingCursor = cursorPos, controlCursor = cursorPos }, Cmd.none )
+                ( { model | trackingCursor = cursorPos }, Cmd.none )
+                    |> andThen (moveTo cursorPos)
                     |> andThen activity
 
             else
