@@ -5,7 +5,10 @@ class ElmEditor extends HTMLElement {
 
     this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
     this._observer = new MutationObserver(this.mutationObserverCallback);
-    this.addEventListener("click", this.caretCallback.bind(this));
+    this.selectionChange = this.selectionChange.bind(this);
+    this.addEventListener("mousedown", this.mousedownCallback.bind(this));
+    this.addEventListener("mouseup", this.mouseupCallback.bind(this));
+    this.mousedown = false;
   }
 
   connectedCallback() {
@@ -17,11 +20,15 @@ class ElmEditor extends HTMLElement {
       subtree: true,
       characterData: true
     });
+
+    document.addEventListener("selectionchange", this.selectionChange)
+
     this.initInterval = setInterval(this.dispatchInit, 1000)
   }
 
   disconnectedCallback() {
     this._observer.disconnect();
+    document.removeEventListener("selectionchange", this.selectionChange)
   }
 
   characterDataMutations(mutationsList) {
@@ -77,6 +84,26 @@ class ElmEditor extends HTMLElement {
     }
   }
 
+  selectionChange(e) {
+    let selection = getSelection(this);
+    selection.mousedown = this.mousedown;
+
+    let event = new CustomEvent("editorselectionchange", {
+      detail: selection
+    });
+
+    this.dispatchEvent(event);
+  };
+
+
+  mousedownCallback(e) {
+      this.mousedown = true;
+  }
+
+  mouseupCallback(e) {
+      this.mousedown = false;
+  }
+
 }
 
 class SelectionState extends HTMLElement {
@@ -87,15 +114,7 @@ class SelectionState extends HTMLElement {
 
   constructor() {
     super();
-    this.selectionChange = this.selectionChange.bind(this);
-  }
 
-  connectedCallback() {
-    document.addEventListener("selectionchange", this.selectionChange)
-  }
-
-  disconnectedCallback() {
-    document.removeEventListener("selectionchange", this.selectionChange)
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -106,15 +125,6 @@ class SelectionState extends HTMLElement {
     }
   }
 
-  selectionChange(e) {
-    console.log(e);
-    let selection = getSelection(this.parentNode);
-    let event = new CustomEvent("editorselectionchange", {
-      detail: selection
-    });
-
-    this.parentNode.dispatchEvent(event);
-  };
 }
 
 customElements.define('elm-editor', ElmEditor);
