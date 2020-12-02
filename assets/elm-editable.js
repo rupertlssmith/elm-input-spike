@@ -84,7 +84,8 @@ class ElmEditable extends HTMLElement {
     let event = new CustomEvent("selectionchange", {
       detail: {
         selection: selection,
-        ctrlEvent: isControlEvent
+        ctrlEvent: isControlEvent,
+        timestamp: (new Date()).getTime()
       }
     });
 

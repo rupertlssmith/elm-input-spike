@@ -224,6 +224,9 @@ update msg model =
             let
                 cursorPos =
                     selectionToRowCol model change.selection
+
+                _ =
+                    Debug.log "change" change
             in
             if change.isControl then
                 ( model, Cmd.none )
@@ -1038,6 +1041,7 @@ lineToPathOffset col line =
 type alias SelectionChangeEvent =
     { selection : Selection
     , isControl : Bool
+    , timestamp : Int
     }
 
 
@@ -1082,6 +1086,7 @@ selectionChangeDecoder =
     Decode.succeed SelectionChangeEvent
         |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
         |> andMap (Decode.at [ "detail", "ctrlEvent" ] Decode.bool)
+        |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
         |> Decode.map SelectionChange
 
 
