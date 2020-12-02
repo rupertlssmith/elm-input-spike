@@ -778,6 +778,9 @@ global =
         , Css.px 0 |> Css.left
         , Css.px 0 |> Css.right
         , Css.px config.lineHeight |> Css.lineHeight
+        , Css.px config.lineHeight |> Css.height
+
+        --, Css.backgroundColor (Css.rgb 190 195 167)
         ]
     , Css.Global.class "cursors"
         [ Css.position Css.relative
@@ -837,11 +840,11 @@ viewCursor model =
     let
         top =
             String.fromFloat
-                (toFloat model.trackingCursor.row * config.lineHeight)
+                (toFloat model.controlCursor.row * config.lineHeight)
                 ++ "px"
 
         left =
-            String.fromInt model.trackingCursor.col ++ "ch"
+            String.fromInt model.controlCursor.col ++ "ch"
     in
     H.div
         [ HA.class "cursor"
