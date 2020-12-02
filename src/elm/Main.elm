@@ -165,7 +165,7 @@ type Msg
     | ContentViewPort (Result Browser.Dom.Error Viewport)
     | Resize
     | EditorChange EditorChangeEvent
-    | SelectionChange Selection Bool
+    | SelectionChange SelectionChangeEvent
     | Scroll ScrollEvent
     | StartSelecting
     | StopSelecting
@@ -216,12 +216,12 @@ update msg model =
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        SelectionChange val ctrlEvent ->
+        SelectionChange change ->
             let
                 cursorPos =
-                    selectionToRowCol model val
+                    selectionToRowCol model change.selection
             in
-            if ctrlEvent then
+            if change.isControl then
                 ( model, Cmd.none )
                     |> andThen (trackTo cursorPos)
                     |> andThen (moveTo cursorPos)
@@ -1031,6 +1031,12 @@ lineToPathOffset col line =
 -- Selection change events.
 
 
+type alias SelectionChangeEvent =
+    { selection : Selection
+    , isControl : Bool
+    }
+
+
 type Selection
     = NoSelection
     | Collapsed
@@ -1069,9 +1075,10 @@ collapsed fNode fOffset =
 
 selectionChangeDecoder : Decode.Decoder Msg
 selectionChangeDecoder =
-    Decode.succeed SelectionChange
-        |> andMap (Decode.at [ "detail" ] selectionDecoder)
-        |> andMap (Decode.at [ "detail", "mousedown" ] Decode.bool)
+    Decode.succeed SelectionChangeEvent
+        |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
+        |> andMap (Decode.at [ "detail", "ctrlEvent" ] Decode.bool)
+        |> Decode.map SelectionChange
 
 
 selectionDecoder : Decode.Decoder Selection

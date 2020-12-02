@@ -6,12 +6,17 @@ class ElmEditor extends HTMLElement {
     this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
     this._observer = new MutationObserver(this.mutationObserverCallback);
     this.selectionChange = this.selectionChange.bind(this);
-    this.addEventListener("mousedown", this.mousedownCallback.bind(this));
-    this.addEventListener("mouseup", this.mouseupCallback.bind(this));
+    this.mousedownCallback = this.mousedownCallback.bind(this);
+    this.mouseupCallback = this.mouseupCallback.bind(this);
+
     this.mousedown = false;
   }
 
   connectedCallback() {
+    this.addEventListener("mousedown", this.mousedownCallback);
+    this.addEventListener("mouseup", this.mouseupCallback);
+    document.addEventListener("selectionchange", this.selectionChange);
+
     this._observer.observe(this, {
       characterDataOldValue: true,
       attributeOldValue: false,
@@ -21,14 +26,14 @@ class ElmEditor extends HTMLElement {
       characterData: true
     });
 
-    document.addEventListener("selectionchange", this.selectionChange)
-
     this.initInterval = setInterval(this.dispatchInit, 1000)
   }
 
   disconnectedCallback() {
-    this._observer.disconnect();
+    this.removeEventListener("mousedown", this.mousedownCallback);
+    this.removeEventListener("mouseup", this.mouseupCallback);
     document.removeEventListener("selectionchange", this.selectionChange)
+    this._observer.disconnect();
   }
 
   characterDataMutations(mutationsList) {
@@ -72,24 +77,17 @@ class ElmEditor extends HTMLElement {
     }
   }
 
-  caretCallback(e) {
-    if (this.contains(event.target)) {
-      const selection = getSelection(this);
-
-      const newEvent = new CustomEvent("mouseselection", {
-        detail: selection
-      });
-
-      this.dispatchEvent(newEvent);
-    }
-  }
-
   selectionChange(e) {
     let selection = getSelection(this);
     selection.mousedown = this.mousedown;
 
+    let isControlEvent = this.mousedown;
+
     let event = new CustomEvent("editorselectionchange", {
-      detail: selection
+      detail: {
+        selection: selection,
+        ctrlEvent: isControlEvent
+      }
     });
 
     this.dispatchEvent(event);
@@ -97,13 +95,12 @@ class ElmEditor extends HTMLElement {
 
 
   mousedownCallback(e) {
-      this.mousedown = true;
+    this.mousedown = true;
   }
 
   mouseupCallback(e) {
-      this.mousedown = false;
+    this.mousedown = false;
   }
-
 }
 
 class SelectionState extends HTMLElement {
@@ -114,7 +111,6 @@ class SelectionState extends HTMLElement {
 
   constructor() {
     super();
-
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -124,7 +120,6 @@ class SelectionState extends HTMLElement {
         break;
     }
   }
-
 }
 
 customElements.define('elm-editor', ElmEditor);
