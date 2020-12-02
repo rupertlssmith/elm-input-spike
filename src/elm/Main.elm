@@ -777,6 +777,10 @@ global =
         , Css.em 1 |> Css.marginLeft
         , Css.em 1 |> Css.marginRight
         , Css.outline3 (Css.px 0) Css.solid Css.transparent
+        , Css.property "user-select" "text"
+        , Css.property "-moz-user-select" "text"
+        , Css.property "-webkit-user-select" "text"
+        , Css.property "-ms-user-select" "text"
 
         --, Css.property "caret-color" "transparent"
         ]
@@ -876,6 +880,9 @@ viewContent model =
         , H.node "elm-editable"
             [ HE.on "textchange" editorChangeDecoder
             , HE.on "selectionchange" selectionChangeDecoder
+            , HA.attribute "spellcheck" "false"
+            , HA.attribute "autocorrect" "off"
+            , HA.attribute "autocapitalize" "off"
             ]
             [ keyedViewLines model
             , H.node "selection-handler"
