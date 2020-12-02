@@ -166,7 +166,6 @@ type Msg
     | Resize
     | EditorChange EditorChangeEvent
     | SelectionChange Selection Bool
-    | MouseSelectionChange Selection
     | Scroll ScrollEvent
     | StartSelecting
     | StopSelecting
@@ -219,31 +218,18 @@ update msg model =
 
         SelectionChange val ctrlEvent ->
             let
-                _ =
-                    Debug.log "SelectionChange" (SelectionChange val ctrlEvent)
+                cursorPos =
+                    selectionToRowCol model val
             in
             if ctrlEvent then
-                let
-                    cursorPos =
-                        selectionToRowCol model val
-
-                    _ =
-                        Debug.log "SelectionChange" "setting control cursor"
-                in
-                ( { model | trackingCursor = cursorPos }, Cmd.none )
+                ( model, Cmd.none )
+                    |> andThen (trackTo cursorPos)
                     |> andThen (moveTo cursorPos)
                     |> andThen activity
 
             else
-                ( { model | trackingCursor = selectionToRowCol model val }, Cmd.none )
-                    |> andThen activity
-
-        MouseSelectionChange val ->
-            let
-                _ =
-                    Debug.log "MouseSelectionChange" val
-            in
-            ( model, Cmd.none )
+                ( model, Cmd.none )
+                    |> andThen (trackTo cursorPos)
 
         Scroll scroll ->
             ( { model
@@ -424,6 +410,11 @@ moveTo pos model =
       }
     , Cmd.none
     )
+
+
+trackTo : RowCol -> Model -> ( Model, Cmd Msg )
+trackTo pos model =
+    ( { model | trackingCursor = pos }, Cmd.none )
 
 
 moveCursorRowBy : Int -> Model -> ( Model, Cmd Msg )
@@ -875,7 +866,6 @@ viewContent model =
         , H.node "elm-editor"
             [ HE.on "editorchange" editorChangeDecoder
             , HE.on "editorselectionchange" selectionChangeDecoder
-            , HE.on "mouseselection" (Decode.at [ "detail" ] selectionDecoder |> Decode.map MouseSelectionChange)
             ]
             [ keyedViewLines model
             , H.node "selection-state"
@@ -1253,21 +1243,6 @@ scrollDecoder =
         |> andMap (Decode.at [ "target", "scrollLeft" ] Decode.float)
         |> andMap (Decode.at [ "target", "scrollWidth" ] Decode.float)
         |> Decode.map Scroll
-
-
-
--- Mouse events.
-
-
-onHover : RowCol -> Attribute Msg
-onHover position =
-    HE.custom "mouseover"
-        (Decode.succeed
-            { message = Hover (HoverChar position)
-            , stopPropagation = True
-            , preventDefault = True
-            }
-        )
 
 
 
