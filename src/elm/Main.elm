@@ -644,7 +644,7 @@ editLine textChanges selection model =
                         Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
                     of
                         ( _ :: row :: _, Just char ) ->
-                            if row == model.controlCursor.row then
+                            if row + model.startLine == model.controlCursor.row then
                                 { accum
                                     | buffer =
                                         TextBuffer.insertCharAt char
@@ -872,7 +872,7 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-state"
-                [ cursorToSelection model |> Debug.log "cursorToSelection" |> HA.attribute "selection"
+                [ cursorToSelection model |> HA.attribute "selection"
                 ]
                 []
             ]
@@ -936,7 +936,7 @@ selectionToRowCol model sel =
                                 |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
                                 |> Maybe.withDefault 0
                     in
-                    { row = row, col = col }
+                    { row = row + model.startLine, col = col }
 
                 _ ->
                     { row = 0, col = 0 }
@@ -965,7 +965,7 @@ cursorToSelection model =
             model.controlCursor
 
         linePath =
-            [ 0, model.controlCursor.row ]
+            [ 0, model.controlCursor.row - model.startLine ]
 
         cursorPath =
             TextBuffer.getLine model.controlCursor.row model.buffer
