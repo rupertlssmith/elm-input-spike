@@ -210,10 +210,10 @@ update msg model =
             ( model, initEditorSize )
 
         EditorChange change ->
-            let
-                _ =
-                    Debug.log "change" change
-            in
+            -- let
+            --     _ =
+            --         Debug.log "change" change
+            -- in
             ( model, Cmd.none )
                 |> andThen (editLine change.characterDataMutations change.selection)
                 |> andThen (moveCursorColBy 1)
@@ -225,8 +225,8 @@ update msg model =
                 cursorPos =
                     selectionToRowCol model change.selection
 
-                _ =
-                    Debug.log "change" change
+                -- _ =
+                --     Debug.log "change" change
             in
             if change.isControl then
                 ( model, Cmd.none )
