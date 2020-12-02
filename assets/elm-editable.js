@@ -1,4 +1,4 @@
-class ElmEditor extends HTMLElement {
+class ElmEditable extends HTMLElement {
 
   constructor() {
     super();
@@ -63,7 +63,7 @@ class ElmEditor extends HTMLElement {
     const characterDataMutations = this.characterDataMutations(mutationsList);
 
     if (!!characterDataMutations) {
-      const event = new CustomEvent("editorchange", {
+      const event = new CustomEvent("textchange", {
         detail: {
           root: element,
           selection: selection,
@@ -83,7 +83,7 @@ class ElmEditor extends HTMLElement {
 
     let isControlEvent = this.mousedown;
 
-    let event = new CustomEvent("editorselectionchange", {
+    let event = new CustomEvent("selectionchange", {
       detail: {
         selection: selection,
         ctrlEvent: isControlEvent
@@ -103,7 +103,7 @@ class ElmEditor extends HTMLElement {
   }
 }
 
-class SelectionState extends HTMLElement {
+class SelectionHandler extends HTMLElement {
 
   static get observedAttributes() {
     return ["selection"];
@@ -122,8 +122,8 @@ class SelectionState extends HTMLElement {
   }
 }
 
-customElements.define('elm-editor', ElmEditor);
-customElements.define('selection-state', SelectionState);
+customElements.define('elm-editable', ElmEditable);
+customElements.define('selection-handler', SelectionHandler);
 
 let getSelection = (node) => {
   const noSelection = {

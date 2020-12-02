@@ -1,4 +1,4 @@
-class ElmEditor extends HTMLElement {
+class ElmEditable extends HTMLElement {
 
   constructor() {
     super();

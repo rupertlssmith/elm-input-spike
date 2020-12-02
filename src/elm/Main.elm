@@ -866,12 +866,12 @@ viewContent model =
         , HA.contenteditable True
         ]
         [ viewCursors model
-        , H.node "elm-editor"
-            [ HE.on "editorchange" editorChangeDecoder
-            , HE.on "editorselectionchange" selectionChangeDecoder
+        , H.node "elm-editable"
+            [ HE.on "textchange" editorChangeDecoder
+            , HE.on "selectionchange" selectionChangeDecoder
             ]
             [ keyedViewLines model
-            , H.node "selection-state"
+            , H.node "selection-handler"
                 [ cursorToSelection model |> HA.attribute "selection"
                 ]
                 []
