@@ -57,7 +57,6 @@ class ElmEditable extends HTMLElement {
   }
 
   mutationObserverCallback(mutationsList, _) {
-    const element = this.querySelector('[data-rte-main="true"]');
     const selection = getSelection(this);
 
     const characterDataMutations = this.characterDataMutations(mutationsList);
@@ -65,7 +64,6 @@ class ElmEditable extends HTMLElement {
     if (!!characterDataMutations) {
       const event = new CustomEvent("textchange", {
         detail: {
-          root: element,
           selection: selection,
           isComposing: this.composing,
           characterDataMutations: characterDataMutations,

@@ -210,6 +210,10 @@ update msg model =
             ( model, initEditorSize )
 
         EditorChange change ->
+            let
+                _ =
+                    Debug.log "change" change
+            in
             ( model, Cmd.none )
                 |> andThen (editLine change.characterDataMutations change.selection)
                 |> andThen (moveCursorColBy 1)
@@ -1108,8 +1112,7 @@ selectionDecoder =
 
 
 type alias EditorChangeEvent =
-    { root : Decode.Value
-    , selection : Selection
+    { selection : Selection
     , characterDataMutations : List TextChange
     , timestamp : Int
     , isComposing : Bool
@@ -1123,7 +1126,6 @@ type alias TextChange =
 editorChangeDecoder : Decode.Decoder Msg
 editorChangeDecoder =
     Decode.succeed EditorChangeEvent
-        |> andMap (Decode.at [ "detail", "root" ] Decode.value)
         |> andMap (Decode.at [ "detail", "selection" ] selectionDecoder)
         |> andMap (Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder)
         |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
