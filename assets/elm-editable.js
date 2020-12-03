@@ -122,8 +122,7 @@ class SelectionHandler extends HTMLElement {
   }
 
   set selection(newValue) {
-    if (JSON.stringify(this.sel) === JSON.stringify(newValue)) {
-    } else {
+    if (diffSelection(this.sel, newValue)) {
       console.log("Selection property changed: " + JSON.stringify(newValue));
       this.sel = newValue;
     }
@@ -136,6 +135,36 @@ class SelectionHandler extends HTMLElement {
 
 customElements.define('elm-editable', ElmEditable);
 customElements.define('selection-handler', SelectionHandler);
+
+let diffSelection = (sel1, sel2) => {
+  if (sel1 == null) {
+    return true;
+  }
+
+  if (sel1.selection != sel2.selection) {
+    return true;
+  }
+
+  if (sel1.selection == "collapsed") {
+    if (sel1.offset != sel2.offset) {
+      return true;
+    }
+    // if (sel1.node != sel2.node) {
+    //   return true;
+    // }
+  }
+
+  if (sel1.selection == "range") {
+    if (sel1.anchorOffset != sel2.anchorOffset) {
+      return true;
+    }
+    if (sel1.focusOffset != sel2.focusOffset) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 let getSelection = (node) => {
   const noSelection = {
