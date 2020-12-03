@@ -1124,23 +1124,24 @@ selectionChangeDecoder =
 
 selectionDecoder : Decode.Decoder Selection
 selectionDecoder =
-    Decode.at [ "selectionExists" ] Decode.bool
+    Decode.at [ "selection" ] Decode.string
         |> Decode.andThen
-            (\exists ->
-                if not exists then
-                    Decode.succeed NoSelection
+            (\tag ->
+                case tag of
+                    "collapsed" ->
+                        Decode.succeed collapsed
+                            |> andMap (Decode.at [ "node" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "offset" ] Decode.int)
 
-                else
-                    Decode.oneOf
-                        [ Decode.succeed range
+                    "range" ->
+                        Decode.succeed range
                             |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
                             |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
                             |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
                             |> andMap (Decode.at [ "focusOffset" ] Decode.int)
-                        , Decode.succeed collapsed
-                            |> andMap (Decode.at [ "node" ] (Decode.list Decode.int))
-                            |> andMap (Decode.at [ "offset" ] Decode.int)
-                        ]
+
+                    _ ->
+                        Decode.succeed NoSelection
             )
 
 
@@ -1148,17 +1149,19 @@ selectionEncoder : Selection -> Encode.Value
 selectionEncoder sel =
     case sel of
         NoSelection ->
-            [ ( "selectionExists", Encode.bool False ) ]
+            [ ( "selection", Encode.string "noselection" ) ]
                 |> Encode.object
 
         Collapsed val ->
-            [ ( "node", Encode.list Encode.int val.node )
+            [ ( "selection", Encode.string "collapsed" )
+            , ( "node", Encode.list Encode.int val.node )
             , ( "offset", Encode.int val.offset )
             ]
                 |> Encode.object
 
         Range val ->
-            [ ( "anchorNode", Encode.list Encode.int val.anchorNode )
+            [ ( "selection", Encode.string "range" )
+            , ( "anchorNode", Encode.list Encode.int val.anchorNode )
             , ( "anchorOffset", Encode.int val.anchorOffset )
             , ( "focusNode", Encode.list Encode.int val.focusNode )
             , ( "focusOffset", Encode.int val.focusOffset )

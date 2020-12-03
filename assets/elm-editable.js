@@ -139,7 +139,7 @@ customElements.define('selection-handler', SelectionHandler);
 
 let getSelection = (node) => {
   const noSelection = {
-    "selectionExists": false
+    "selection": "noselection"
   };
   const selectionObj = document.getSelection();
 
@@ -155,7 +155,7 @@ let getSelection = (node) => {
     const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
 
     return {
-      "selectionExists": true,
+      "selection": "collapsed",
       "offset": focusOffset,
       "node": focusPath,
     }
@@ -171,7 +171,7 @@ let getSelection = (node) => {
     const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
 
     return {
-      "selectionExists": true,
+      "selection": "range",
       "anchorOffset": anchorOffset,
       "focusOffset": focusOffset,
       "anchorNode": anchorPath,
