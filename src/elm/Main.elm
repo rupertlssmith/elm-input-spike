@@ -203,20 +203,19 @@ update msg model =
 
         ( _, SelectionChange change ) ->
             let
-                cursorPos =
-                    selectionToRowCol model change.selection
+                cursor =
+                    selectionToCursor model.startLine model.buffer change.selection
             in
             if change.isControl then
-                -- ( model, Cmd.none )
-                --     |> andThen (trackTo cursorPos)
-                --     |> andThen (moveTo cursorPos)
-                --     |> andThen activity
-                Debug.todo "SelectionChange"
+                ( model, Cmd.none )
+                    |> andThen (trackTo cursor)
+                    -- |> andThen (moveTo cursor)
+                    |> andThen activity
+                    |> Debug.todo "SelectionChange"
 
             else
-                -- ( model, Cmd.none )
-                --     |> andThen (trackTo cursorPos)
-                Debug.todo "SelectionChange"
+                ( model, Cmd.none )
+                    |> andThen (trackTo cursor)
 
         ( _, Scroll scroll ) ->
             ( { model
@@ -974,29 +973,47 @@ collapsed fNode fOffset =
 -- Selection and cursor conversion.
 
 
-selectionToRowCol : Model -> Selection -> RowCol
-selectionToRowCol model sel =
-    -- case sel of
-    --     NoSelection ->
-    --         { row = 0, col = 0 }
-    --
-    --     Collapsed { node, offset } ->
-    --         case node of
-    --             _ :: row :: child :: _ ->
-    --                 let
-    --                     col =
-    --                         TextBuffer.getLine row model.buffer
-    --                             |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
-    --                             |> Maybe.withDefault 0
-    --                 in
-    --                 { row = row + model.startLine, col = col }
-    --
-    --             _ ->
-    --                 { row = 0, col = 0 }
-    --
-    --     Range _ ->
-    --         { row = 0, col = 0 }
-    Debug.todo "selectionToCursor"
+selectionToCursor : Int -> TextBuffer ctx tag -> Selection -> Cursor
+selectionToCursor startLine buffer sel =
+    case sel of
+        NoSelection ->
+            NoCursor
+
+        Collapsed { node, offset } ->
+            case node of
+                _ :: row :: child :: _ ->
+                    let
+                        col =
+                            TextBuffer.getLine row buffer
+                                |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
+                                |> Maybe.withDefault 0
+                    in
+                    ActiveCursor { row = row + startLine, col = col }
+
+                _ ->
+                    NoCursor
+
+        Range { anchorNode, anchorOffset, focusNode, focusOffset } ->
+            case ( anchorNode, focusNode ) of
+                ( _ :: anchorRow :: anchorChild :: _, _ :: focusRow :: focusChild :: _ ) ->
+                    let
+                        anchorCol =
+                            TextBuffer.getLine anchorRow buffer
+                                |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
+                                |> Maybe.withDefault 0
+
+                        focusCol =
+                            TextBuffer.getLine focusRow buffer
+                                |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
+                                |> Maybe.withDefault 0
+                    in
+                    RegionCursor
+                        { start = { row = anchorRow + startLine, col = anchorCol }
+                        , end = { row = focusRow + startLine, col = focusCol }
+                        }
+
+                _ ->
+                    NoCursor
 
 
 pathOffsetToCol : Int -> Int -> List ( tag, String ) -> Int
