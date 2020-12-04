@@ -122,7 +122,7 @@ class SelectionHandler extends HTMLElement {
   }
 
   set selection(newValue) {
-    if (diffSelection(this.sel, newValue)) {
+    if (!equalSelection(this.sel, newValue)) {
       console.log("Selection property changed: " + JSON.stringify(newValue));
       this.sel = newValue;
     }
@@ -136,35 +136,6 @@ class SelectionHandler extends HTMLElement {
 customElements.define('elm-editable', ElmEditable);
 customElements.define('selection-handler', SelectionHandler);
 
-let diffSelection = (sel1, sel2) => {
-  if (sel1 == null) {
-    return true;
-  }
-
-  if (sel1.selection != sel2.selection) {
-    return true;
-  }
-
-  if (sel1.selection == "collapsed") {
-    if (sel1.offset != sel2.offset) {
-      return true;
-    }
-    // if (sel1.node != sel2.node) {
-    //   return true;
-    // }
-  }
-
-  if (sel1.selection == "range") {
-    if (sel1.anchorOffset != sel2.anchorOffset) {
-      return true;
-    }
-    if (sel1.focusOffset != sel2.focusOffset) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 let getSelection = (node) => {
   const noSelection = {
@@ -334,3 +305,59 @@ let adjustOffset = (node, offset) => {
 
   return offset;
 };
+
+// Returns 'true' if two selection objects are the same.
+let equalSelection = (sel1, sel2) => {
+  if (!sel1)
+    return false;
+
+  if (!sel2)
+    return false;
+
+  if (sel1.selection != sel2.selection)
+    return false;
+
+  if (sel1.selection == "collapsed") {
+    if (sel1.offset != sel2.offset)
+      return false;
+
+    if (!equalArray(sel1.node, sel2.node))
+      return false;
+  }
+
+  if (sel1.selection == "range") {
+    if (sel1.anchorOffset != sel2.anchorOffset)
+      return false;
+
+    if (sel1.focusOffset != sel2.focusOffset)
+      return false;
+
+    if (!equalArray(sel1.focusNode, sel2.focusNode))
+      return false;
+
+    if (!equalArray(sel1.anchorNode, sel2.anchorNode))
+      return false;
+  }
+
+  return true;
+}
+
+// Returns 'true' if two arrays are the same by element value.
+// Does not support nested arrays or deep comparison of elements.
+let equalArray = (arr1, arr2) => {
+  if (!arr1)
+    return false;
+
+  if (!arr2)
+    return false;
+
+  if (arr1.length != arr2.length)
+    return false;
+
+  for (var i = 0, l = arr1.length; i < l; i++) {
+    if (arr1[i] != arr2[i])
+      return false;
+  }
+
+  return true;
+}
