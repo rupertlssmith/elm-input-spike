@@ -71,12 +71,6 @@ type alias Model =
     }
 
 
-type alias RowCol =
-    { row : Int
-    , col : Int
-    }
-
-
 type HoverPos
     = NoHover
     | HoverLine Int
@@ -940,6 +934,95 @@ viewLine row line =
 -- Coordinate conversion.
 
 
+type alias RowCol =
+    { row : Int
+    , col : Int
+    }
+
+
+type Selection
+    = NoSelection
+    | Collapsed
+        { offset : Int
+        , node : Path
+        }
+    | Range
+        { anchorOffset : Int
+        , anchorNode : Path
+        , focusOffset : Int
+        , focusNode : Path
+        }
+
+
+type alias Path =
+    List Int
+
+
+selectionDecoder : Decode.Decoder Selection
+selectionDecoder =
+    Decode.at [ "selection" ] Decode.string
+        |> Decode.andThen
+            (\tag ->
+                case tag of
+                    "collapsed" ->
+                        Decode.succeed collapsed
+                            |> andMap (Decode.at [ "node" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "offset" ] Decode.int)
+
+                    "range" ->
+                        Decode.succeed range
+                            |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
+                            |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
+                            |> andMap (Decode.at [ "focusOffset" ] Decode.int)
+
+                    _ ->
+                        Decode.succeed NoSelection
+            )
+
+
+selectionEncoder : Selection -> Encode.Value
+selectionEncoder sel =
+    case sel of
+        NoSelection ->
+            [ ( "selection", Encode.string "noselection" ) ]
+                |> Encode.object
+
+        Collapsed val ->
+            [ ( "selection", Encode.string "collapsed" )
+            , ( "node", Encode.list Encode.int val.node )
+            , ( "offset", Encode.int val.offset )
+            ]
+                |> Encode.object
+
+        Range val ->
+            [ ( "selection", Encode.string "range" )
+            , ( "anchorNode", Encode.list Encode.int val.anchorNode )
+            , ( "anchorOffset", Encode.int val.anchorOffset )
+            , ( "focusNode", Encode.list Encode.int val.focusNode )
+            , ( "focusOffset", Encode.int val.focusOffset )
+            ]
+                |> Encode.object
+
+
+range : Path -> Int -> Path -> Int -> Selection
+range aNode aOffset fNode fOffset =
+    Range
+        { anchorOffset = aOffset
+        , anchorNode = aNode
+        , focusOffset = fOffset
+        , focusNode = fNode
+        }
+
+
+collapsed : Path -> Int -> Selection
+collapsed fNode fOffset =
+    Collapsed
+        { offset = fOffset
+        , node = fNode
+        }
+
+
 selectionToRowCol : Model -> Selection -> RowCol
 selectionToRowCol model sel =
     case sel of
@@ -1038,42 +1121,6 @@ type alias SelectionChangeEvent =
     }
 
 
-type Selection
-    = NoSelection
-    | Collapsed
-        { offset : Int
-        , node : Path
-        }
-    | Range
-        { anchorOffset : Int
-        , anchorNode : Path
-        , focusOffset : Int
-        , focusNode : Path
-        }
-
-
-type alias Path =
-    List Int
-
-
-range : Path -> Int -> Path -> Int -> Selection
-range aNode aOffset fNode fOffset =
-    Range
-        { anchorOffset = aOffset
-        , anchorNode = aNode
-        , focusOffset = fOffset
-        , focusNode = fNode
-        }
-
-
-collapsed : Path -> Int -> Selection
-collapsed fNode fOffset =
-    Collapsed
-        { offset = fOffset
-        , node = fNode
-        }
-
-
 selectionChangeDecoder : Decode.Decoder Msg
 selectionChangeDecoder =
     Decode.succeed SelectionChangeEvent
@@ -1081,53 +1128,6 @@ selectionChangeDecoder =
         |> andMap (Decode.at [ "detail", "ctrlEvent" ] Decode.bool)
         |> andMap (Decode.at [ "detail", "timestamp" ] Decode.int)
         |> Decode.map SelectionChange
-
-
-selectionDecoder : Decode.Decoder Selection
-selectionDecoder =
-    Decode.at [ "selection" ] Decode.string
-        |> Decode.andThen
-            (\tag ->
-                case tag of
-                    "collapsed" ->
-                        Decode.succeed collapsed
-                            |> andMap (Decode.at [ "node" ] (Decode.list Decode.int))
-                            |> andMap (Decode.at [ "offset" ] Decode.int)
-
-                    "range" ->
-                        Decode.succeed range
-                            |> andMap (Decode.at [ "anchorNode" ] (Decode.list Decode.int))
-                            |> andMap (Decode.at [ "anchorOffset" ] Decode.int)
-                            |> andMap (Decode.at [ "focusNode" ] (Decode.list Decode.int))
-                            |> andMap (Decode.at [ "focusOffset" ] Decode.int)
-
-                    _ ->
-                        Decode.succeed NoSelection
-            )
-
-
-selectionEncoder : Selection -> Encode.Value
-selectionEncoder sel =
-    case sel of
-        NoSelection ->
-            [ ( "selection", Encode.string "noselection" ) ]
-                |> Encode.object
-
-        Collapsed val ->
-            [ ( "selection", Encode.string "collapsed" )
-            , ( "node", Encode.list Encode.int val.node )
-            , ( "offset", Encode.int val.offset )
-            ]
-                |> Encode.object
-
-        Range val ->
-            [ ( "selection", Encode.string "range" )
-            , ( "anchorNode", Encode.list Encode.int val.anchorNode )
-            , ( "anchorOffset", Encode.int val.anchorOffset )
-            , ( "focusNode", Encode.list Encode.int val.focusNode )
-            , ( "focusOffset", Encode.int val.focusOffset )
-            ]
-                |> Encode.object
 
 
 
