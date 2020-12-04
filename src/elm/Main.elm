@@ -811,7 +811,9 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-handler"
-                [ cursorToSelectionProperty model |> HA.property "selection"
+                [ cursorToSelection model.controlCursor model.startLine model.buffer
+                    |> selectionEncoder
+                    |> HA.property "selection"
                 ]
                 []
             ]
@@ -974,26 +976,27 @@ collapsed fNode fOffset =
 
 selectionToRowCol : Model -> Selection -> RowCol
 selectionToRowCol model sel =
-    case sel of
-        NoSelection ->
-            { row = 0, col = 0 }
-
-        Collapsed { node, offset } ->
-            case node of
-                _ :: row :: child :: _ ->
-                    let
-                        col =
-                            TextBuffer.getLine row model.buffer
-                                |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
-                                |> Maybe.withDefault 0
-                    in
-                    { row = row + model.startLine, col = col }
-
-                _ ->
-                    { row = 0, col = 0 }
-
-        Range _ ->
-            { row = 0, col = 0 }
+    -- case sel of
+    --     NoSelection ->
+    --         { row = 0, col = 0 }
+    --
+    --     Collapsed { node, offset } ->
+    --         case node of
+    --             _ :: row :: child :: _ ->
+    --                 let
+    --                     col =
+    --                         TextBuffer.getLine row model.buffer
+    --                             |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
+    --                             |> Maybe.withDefault 0
+    --                 in
+    --                 { row = row + model.startLine, col = col }
+    --
+    --             _ ->
+    --                 { row = 0, col = 0 }
+    --
+    --     Range _ ->
+    --         { row = 0, col = 0 }
+    Debug.todo "selectionToCursor"
 
 
 pathOffsetToCol : Int -> Int -> List ( tag, String ) -> Int
@@ -1009,24 +1012,60 @@ pathOffsetToCol child offset line =
             pathOffsetToCol (child - 1) (offset + String.length (Tuple.second tl)) tls
 
 
-cursorToSelectionProperty : Model -> Encode.Value
-cursorToSelectionProperty model =
-    -- let
-    --     rowcol =
-    --         pos
-    --
-    --     linePath =
-    --         [ 0, pos.row - model.startLine ]
-    --
-    --     cursorPath =
-    --         TextBuffer.getLine pos.row model.buffer
-    --             |> Maybe.map (lineToPathOffset pos.col)
-    --             |> Maybe.map (Tuple.mapFirst (List.append linePath))
-    --             |> Maybe.map (\( node, offset ) -> selectionEncoder (Collapsed { node = node, offset = offset }))
-    --             |> Maybe.withDefault (selectionEncoder NoSelection)
-    -- in
-    -- cursorPath
-    Debug.todo "cursorToSelectionProperty"
+cursorToSelection : Cursor -> Int -> TextBuffer ctx tag -> Selection
+cursorToSelection cursor startLine buffer =
+    case cursor of
+        NoCursor ->
+            NoSelection
+
+        ActiveCursor pos ->
+            let
+                sel =
+                    TextBuffer.getLine pos.row buffer
+                        |> Maybe.map (fullPathOffset (pos.row - startLine) pos.col)
+                        |> Maybe.map (\( node, offset ) -> Collapsed { node = node, offset = offset })
+                        |> Maybe.withDefault NoSelection
+            in
+            sel
+
+        RegionCursor { start, end } ->
+            let
+                maybeStartPathOffset =
+                    TextBuffer.getLine start.row buffer
+                        |> Maybe.map (fullPathOffset (start.row - startLine) start.col)
+
+                maybeEndPathOffset =
+                    TextBuffer.getLine end.row buffer
+                        |> Maybe.map (fullPathOffset (end.row - startLine) end.col)
+
+                sel =
+                    case ( maybeStartPathOffset, maybeEndPathOffset ) of
+                        ( Just ( anchorNode, anchorOffset ), Just ( focusNode, focusOffset ) ) ->
+                            Range
+                                { anchorNode = anchorNode
+                                , anchorOffset = anchorOffset
+                                , focusNode = focusNode
+                                , focusOffset = focusOffset
+                                }
+
+                        _ ->
+                            NoSelection
+            in
+            sel
+
+
+fullPathOffset : Int -> Int -> TextBuffer.Line tag ctx -> ( Path, Int )
+fullPathOffset row col line =
+    let
+        linePath =
+            [ 0, row ]
+
+        cursorPath =
+            line
+                |> lineToPathOffset col
+                |> Tuple.mapFirst (List.append linePath)
+    in
+    cursorPath
 
 
 lineToPathOffset : Int -> TextBuffer.Line tag ctx -> ( Path, Int )
