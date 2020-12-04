@@ -104,27 +104,14 @@ class ElmEditable extends HTMLElement {
 
 class SelectionHandler extends HTMLElement {
 
-  static get observedAttributes() {
-    return ["selection"];
-  }
-
   constructor() {
     super();
   }
 
-  attributeChangedCallback(name, oldValue, newValue) {
-    switch (name) {
-      case 'selection':
-        console.log("Selection attribute changed: " + newValue);
-        setSelection(this.parentNode, newValue);
-        break;
-    }
-  }
-
   set selection(newValue) {
     if (!equalSelection(this.sel, newValue)) {
-      console.log("Selection property changed: " + JSON.stringify(newValue));
       this.sel = newValue;
+      setSelection(this.parentNode, newValue);
     }
   }
 
@@ -180,20 +167,28 @@ let getSelection = (node) => {
   }
 }
 
-let setSelection = (node, selectionDesc) => {
-  let selectionObj = {};
+let setSelection = (node, selection) => {
+  let focusOffset;
+  let focusNode;
 
-  for (let pair of selectionDesc.split(",")) {
-    let splitPair = pair.split("=");
-    if (splitPair.length === 2) {
-      selectionObj[splitPair[0]] = splitPair[1]
-    }
+  let anchorOffset;
+  let anchorNode;
+
+  if ("noselection" == selection.selection) {
+    return;
+  } else if ("collapsed" == selection.selection) {
+    focusOffset = selection.offset;
+    focusNode = findNodeFromPath(selection.node, node)
+
+    anchorOffset = focusOffset;
+    anchorNode = focusNode;
+  } else if ("range" == selection.selection) {
+    focusOffset = selection.focusOffset;
+    focusNode = findNodeFromPath(selection.focusNode, node);
+
+    anchorOffset = selection.anchorOffset;
+    anchorNode = findNodeFromPath(selection.anchorNode, node);
   }
-
-  let focusOffset = Number(selectionObj["focus-offset"]);
-  const focusNode = findNodeFromPath(selectionObj["focus-node"], node)
-  let anchorOffset = Number(selectionObj["anchor-offset"]);
-  const anchorNode = findNodeFromPath(selectionObj["anchor-node"], node)
 
   if (focusNode && anchorNode) {
     const sel = document.getSelection();
@@ -206,7 +201,6 @@ let setSelection = (node, selectionDesc) => {
     } catch (e) {}
   }
 }
-
 
 const getSelectionPath = (node, editor, offset) => {
   const originalNode = node;
@@ -264,12 +258,8 @@ const findNodeFromPath = (path, editor) => {
     return null;
   }
 
-  if (typeof path === "string") {
-    path = path.split(":").map((v) => Number(v));
-  }
-
   let node = editor;
-  let newPath = path;
+  let newPath = path.concat(); // Copies array, original not mutated.
 
   while (newPath.length && node) {
     let index = newPath.shift();

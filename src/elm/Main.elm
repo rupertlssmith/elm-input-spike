@@ -887,8 +887,7 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-handler"
-                [ cursorToSelectionAttr model |> HA.attribute "selection"
-                , cursorToSelectionProperty model |> HA.property "selection"
+                [ cursorToSelectionProperty model |> HA.property "selection"
                 ]
                 []
             ]
@@ -978,25 +977,6 @@ pathOffsetToCol child offset line =
             pathOffsetToCol (child - 1) (offset + String.length (Tuple.second tl)) tls
 
 
-cursorToSelectionAttr : Model -> String
-cursorToSelectionAttr model =
-    let
-        rowcol =
-            model.controlCursor
-
-        linePath =
-            [ 0, model.controlCursor.row - model.startLine ]
-
-        cursorPath =
-            TextBuffer.getLine model.controlCursor.row model.buffer
-                |> Maybe.map (lineToPathOffset model.controlCursor.col)
-                |> Maybe.map (Tuple.mapFirst (List.append linePath))
-                |> Maybe.map pathOffsetToSelection
-                |> Maybe.withDefault (pathOffsetToSelection ( [ 0, 0, 0 ], 0 ))
-    in
-    cursorPath
-
-
 cursorToSelectionProperty : Model -> Encode.Value
 cursorToSelectionProperty model =
     let
@@ -1014,25 +994,6 @@ cursorToSelectionProperty model =
                 |> Maybe.withDefault (selectionEncoder NoSelection)
     in
     cursorPath
-
-
-pathOffsetToSelection : ( Path, Int ) -> String
-pathOffsetToSelection ( path, offset ) =
-    let
-        pathString =
-            List.map String.fromInt path |> List.intersperse ":" |> String.concat
-
-        offsetString =
-            String.fromInt offset
-    in
-    "focus-offset="
-        ++ String.fromInt offset
-        ++ ",focus-node="
-        ++ pathString
-        ++ ",anchor-offset="
-        ++ String.fromInt offset
-        ++ ",anchor-node="
-        ++ pathString
 
 
 lineToPathOffset : Int -> TextBuffer.Line tag ctx -> ( Path, Int )
