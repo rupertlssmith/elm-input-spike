@@ -931,13 +931,23 @@ viewLine row line =
 
 
 
--- Coordinate conversion.
+-- Cursor model.
+
+
+type Cursor
+    = NoCursor
+    | ActiveCursor RowCol
+    | RegionCursor { start : RowCol, end : RowCol }
 
 
 type alias RowCol =
     { row : Int
     , col : Int
     }
+
+
+
+-- Browser selections.
 
 
 type Selection
@@ -1021,6 +1031,10 @@ collapsed fNode fOffset =
         { offset = fOffset
         , node = fNode
         }
+
+
+
+-- Selection and cursor conversion.
 
 
 selectionToRowCol : Model -> Selection -> RowCol
