@@ -94,10 +94,12 @@ class ElmEditable extends HTMLElement {
 
 
   mousedownCallback(e) {
+    console.log("mousedown");
     this.mousedown = true;
   }
 
   mouseupCallback(e) {
+    console.log("mouseup");
     this.mousedown = false;
   }
 }

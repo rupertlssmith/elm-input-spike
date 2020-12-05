@@ -201,6 +201,9 @@ update msg model =
 
         ( _, SelectionChange change ) ->
             let
+                _ =
+                    Debug.log "SelectionChange" change
+
                 cursor =
                     selectionToCursor model.startLine model.buffer change.selection
             in
