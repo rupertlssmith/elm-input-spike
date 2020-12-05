@@ -625,6 +625,10 @@ editLine textChanges cursor model =
             --         modifyCharAt offset
             -- in
             -- ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
+            let
+                _ =
+                    Debug.log "textChanges" textChanges
+            in
             ( { model | editKey = model.editKey + 1 }, Cmd.none )
 
 
