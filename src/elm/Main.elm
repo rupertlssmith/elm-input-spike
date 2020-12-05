@@ -207,9 +207,8 @@ update msg model =
             if change.isControl then
                 ( model, Cmd.none )
                     |> andThen (trackTo cursor)
-                    -- |> andThen (moveTo cursor)
+                    |> andThen (setCursor cursor)
                     |> andThen activity
-                    |> Debug.todo "SelectionChange"
 
             else
                 ( model, Cmd.none )
@@ -295,7 +294,7 @@ update msg model =
 
         ( ActiveCursor pos, FileHome ) ->
             ( model, Cmd.none )
-                |> andThen (moveTo { row = 0, col = 0 })
+                |> andThen (ActiveCursor { row = 0, col = 0 } |> setCursor)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
@@ -307,10 +306,11 @@ update msg model =
             in
             ( model, Cmd.none )
                 |> andThen
-                    (moveTo
+                    (ActiveCursor
                         { row = lastRow
                         , col = TextBuffer.lastColumn model.buffer lastRow
                         }
+                        |> setCursor
                     )
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
@@ -378,14 +378,32 @@ andThen fn ( model, cmd ) =
     ( nextModel, Cmd.batch [ cmd, nextCmd ] )
 
 
-moveTo : RowCol -> Model -> ( Model, Cmd Msg )
-moveTo pos model =
-    ( { model
-        | controlCursor = ActiveCursor pos
-        , targetCol = pos.col
-      }
-    , Cmd.none
-    )
+setCursor : Cursor -> Model -> ( Model, Cmd Msg )
+setCursor cursor model =
+    case cursor of
+        NoCursor ->
+            ( { model
+                | controlCursor = cursor
+                , targetCol = 0
+              }
+            , Cmd.none
+            )
+
+        ActiveCursor pos ->
+            ( { model
+                | controlCursor = cursor
+                , targetCol = pos.col
+              }
+            , Cmd.none
+            )
+
+        RegionCursor _ ->
+            ( { model
+                | controlCursor = cursor
+                , targetCol = 0
+              }
+            , Cmd.none
+            )
 
 
 trackTo : Cursor -> Model -> ( Model, Cmd Msg )
