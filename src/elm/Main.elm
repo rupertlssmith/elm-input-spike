@@ -193,12 +193,8 @@ update msg model =
             ( model, initEditorSize )
 
         ( ActiveCursor pos, EditorChange change ) ->
-            let
-                cursor =
-                    selectionToCursor model.startLine model.buffer change.selection
-            in
             ( model, Cmd.none )
-                |> andThen (editLine change.characterDataMutations cursor change.selection)
+                |> andThen (editLine change.characterDataMutations model.controlCursor change.selection)
                 |> andThen (moveCursorColBy 1 pos)
                 |> andThen rippleBuffer
                 |> andThen activity
@@ -590,9 +586,6 @@ editLine textChanges cursor selection model =
     case ( cursor, selection ) of
         ( ActiveCursor pos, Collapsed { offset } ) ->
             let
-                _ =
-                    Debug.log "textChanges" textChanges
-
                 modifyCharAt charOffset =
                     List.foldl
                         (\textChange accum ->
