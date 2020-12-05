@@ -198,7 +198,7 @@ update msg model =
                     selectionToCursor model.startLine model.buffer change.selection
             in
             ( model, Cmd.none )
-                |> andThen (editLine change.characterDataMutations cursor)
+                |> andThen (editLine change.characterDataMutations cursor change.selection)
                 |> andThen (moveCursorColBy 1 pos)
                 |> andThen rippleBuffer
                 |> andThen activity
@@ -585,51 +585,52 @@ rippleBuffer model =
     )
 
 
-editLine : List TextChange -> Cursor -> Model -> ( Model, Cmd Msg )
-editLine textChanges cursor model =
-    case cursor of
-        NoCursor ->
-            ( model, Cmd.none )
-
-        RegionCursor _ ->
-            ( model, Cmd.none )
-
-        ActiveCursor pos ->
-            -- let
-            --     modifyCharAt charOffset =
-            --         List.foldl
-            --             (\textChange accum ->
-            --                 case
-            --                     Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
-            --                 of
-            --                     ( _ :: row :: _, Just char ) ->
-            --                         if row + model.startLine == pos.row then
-            --                             { accum
-            --                                 | buffer =
-            --                                     TextBuffer.insertCharAt char
-            --                                         pos.row
-            --                                         pos.col
-            --                                         accum.buffer
-            --                             }
-            --
-            --                         else
-            --                             accum
-            --
-            --                     _ ->
-            --                         accum
-            --             )
-            --             model
-            --             textChanges
-            --
-            --     editedModel =
-            --         modifyCharAt offset
-            -- in
-            -- ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
+editLine : List TextChange -> Cursor -> Selection -> Model -> ( Model, Cmd Msg )
+editLine textChanges cursor selection model =
+    case ( cursor, selection ) of
+        ( ActiveCursor pos, Collapsed { offset } ) ->
             let
                 _ =
                     Debug.log "textChanges" textChanges
+
+                modifyCharAt charOffset =
+                    List.foldl
+                        (\textChange accum ->
+                            case
+                                Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
+                            of
+                                ( _ :: row :: _, Just char ) ->
+                                    if row + model.startLine == pos.row then
+                                        { accum
+                                            | buffer =
+                                                TextBuffer.insertCharAt char
+                                                    pos.row
+                                                    pos.col
+                                                    accum.buffer
+                                        }
+
+                                    else
+                                        accum
+
+                                _ ->
+                                    accum
+                        )
+                        model
+                        textChanges
+
+                editedModel =
+                    modifyCharAt offset
             in
-            ( { model | editKey = model.editKey + 1 }, Cmd.none )
+            ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
+
+        ( NoCursor, _ ) ->
+            ( model, Cmd.none )
+
+        ( RegionCursor _, _ ) ->
+            ( model, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
 
 
 insertChar : Char -> RowCol -> Model -> ( Model, Cmd Msg )
