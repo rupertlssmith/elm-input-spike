@@ -54,15 +54,13 @@ type alias Model =
     { buffer : TextBuffer Tag Tag
     , top : Float
     , height : Float
-    , controlCursor : RowCol
-    , trackingCursor : RowCol
-    , hover : HoverPos
+    , controlCursor : Cursor
+    , trackingCursor : Cursor
     , scrollRow : Int
     , targetCol : Int
     , linesPerPage : Int
     , startLine : Int
     , endLine : Int
-    , cursorIndex : Int
     , bufferHeight : Float
     , bottomOffset : Float
     , blinker : Bool
@@ -71,25 +69,17 @@ type alias Model =
     }
 
 
-type HoverPos
-    = NoHover
-    | HoverLine Int
-    | HoverChar RowCol
-
-
 init _ =
     ( { buffer = TextBuffer.empty initialCtx tagLineFn
       , top = 0
       , height = 0
-      , controlCursor = { row = 0, col = 0 }
-      , trackingCursor = { row = 0, col = 0 }
-      , hover = NoHover
+      , controlCursor = NoCursor
+      , trackingCursor = NoCursor
       , scrollRow = 0
       , targetCol = 0
       , linesPerPage = 0
       , startLine = 0
       , endLine = 0
-      , cursorIndex = 0
       , bufferHeight = 0.0
       , bottomOffset = 0.0
       , blinker = False
@@ -164,8 +154,6 @@ type Msg
     | Scroll ScrollEvent
     | StartSelecting
     | StopSelecting
-    | GoToHoveredPosition
-    | Hover HoverPos
     | MoveUp
     | MoveDown
     | MoveLeft
@@ -187,11 +175,11 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        RandomBuffer buffer ->
+    case ( model.controlCursor, msg ) of
+        ( _, RandomBuffer buffer ) ->
             ( { model | buffer = buffer }, Cmd.none )
 
-        ContentViewPort result ->
+        ( _, ContentViewPort result ) ->
             case result of
                 Ok viewport ->
                     ( model, Cmd.none )
@@ -201,39 +189,32 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        Resize ->
+        ( _, Resize ) ->
             ( model, initEditorSize )
 
-        EditorChange change ->
-            -- let
-            --     _ =
-            --         Debug.log "change" change
-            -- in
+        ( ActiveCursor pos, EditorChange change ) ->
             ( model, Cmd.none )
-                |> andThen (editLine change.characterDataMutations change.selection)
-                |> andThen (moveCursorColBy 1)
+                |> andThen (editLine change.characterDataMutations model.controlCursor change.selection)
+                |> andThen (moveCursorColBy 1 pos)
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        SelectionChange change ->
+        ( _, SelectionChange change ) ->
             let
-                cursorPos =
-                    selectionToRowCol model change.selection
-
-                -- _ =
-                --     Debug.log "change" change
+                cursor =
+                    selectionToCursor model.startLine model.buffer change.selection
             in
             if change.isControl then
                 ( model, Cmd.none )
-                    |> andThen (trackTo cursorPos)
-                    |> andThen (moveTo cursorPos)
+                    |> andThen (trackTo cursor)
+                    |> andThen (setCursor cursor)
                     |> andThen activity
 
             else
                 ( model, Cmd.none )
-                    |> andThen (trackTo cursorPos)
+                    |> andThen (trackTo cursor)
 
-        Scroll scroll ->
+        ( _, Scroll scroll ) ->
             ( { model
                 | top = scroll.scrollTop
                 , scrollRow = scroll.scrollTop / config.lineHeight |> round
@@ -242,156 +223,149 @@ update msg model =
             )
                 |> andThen calcViewableRegion
 
-        StartSelecting ->
+        ( _, StartSelecting ) ->
             ( model, Cmd.none )
 
-        StopSelecting ->
+        ( _, StopSelecting ) ->
             ( model, Cmd.none )
 
-        Hover hover ->
-            ( { model | hover = hover }, Cmd.none )
-                |> andThen sanitizeHover
-
-        GoToHoveredPosition ->
+        ( ActiveCursor pos, MoveUp ) ->
             ( model, Cmd.none )
-                |> andThen cursorToHover
-
-        MoveUp ->
-            ( model, Cmd.none )
-                |> andThen (moveCursorRowBy -1)
+                |> andThen (moveCursorRowBy -1 pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
 
-        MoveDown ->
+        ( ActiveCursor pos, MoveDown ) ->
             ( model, Cmd.none )
-                |> andThen (moveCursorRowBy 1)
+                |> andThen (moveCursorRowBy 1 pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        MoveLeft ->
+        ( ActiveCursor pos, MoveLeft ) ->
             let
                 lastColPrevRow =
-                    TextBuffer.lastColumn model.buffer (model.controlCursor.row - 1)
+                    TextBuffer.lastColumn model.buffer (pos.row - 1)
             in
             ( model, Cmd.none )
-                |> andThen (cursorLeft lastColPrevRow)
+                |> andThen (cursorLeft lastColPrevRow pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
 
-        MoveRight ->
+        ( ActiveCursor pos, MoveRight ) ->
             ( model, Cmd.none )
-                |> andThen cursorRight
+                |> andThen (cursorRight pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        PageUp ->
+        ( ActiveCursor pos, PageUp ) ->
             ( model, Cmd.none )
-                |> andThen (moveCursorRowBy -model.linesPerPage)
+                |> andThen (moveCursorRowBy -model.linesPerPage pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
 
-        PageDown ->
+        ( ActiveCursor pos, PageDown ) ->
             ( model, Cmd.none )
-                |> andThen (moveCursorRowBy model.linesPerPage)
+                |> andThen (moveCursorRowBy model.linesPerPage pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        LineHome ->
+        ( ActiveCursor pos, LineHome ) ->
             ( model, Cmd.none )
-                |> andThen (moveCursorColBy -model.controlCursor.col)
+                |> andThen (moveCursorColBy -pos.col pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
 
-        LineEnd ->
+        ( ActiveCursor pos, LineEnd ) ->
             ( model, Cmd.none )
-                |> andThen (moveCursorColBy (TextBuffer.lastColumn model.buffer model.controlCursor.row - model.controlCursor.col))
+                |> andThen (moveCursorColBy (TextBuffer.lastColumn model.buffer pos.row - pos.col) pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
 
-        FileHome ->
+        ( ActiveCursor pos, FileHome ) ->
             ( model, Cmd.none )
-                |> andThen (moveTo { row = 0, col = 0 })
+                |> andThen (ActiveCursor { row = 0, col = 0 } |> setCursor)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen activity
 
-        FileEnd ->
+        ( ActiveCursor pos, FileEnd ) ->
             let
                 lastRow =
                     TextBuffer.length model.buffer - 1
             in
             ( model, Cmd.none )
                 |> andThen
-                    (moveTo
+                    (ActiveCursor
                         { row = lastRow
                         , col = TextBuffer.lastColumn model.buffer lastRow
                         }
+                        |> setCursor
                     )
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        InsertChar char ->
+        ( ActiveCursor pos, InsertChar char ) ->
             ( model, Cmd.none )
-                |> andThen (insertChar char)
-                |> andThen (moveCursorColBy 1)
+                |> andThen (insertChar char pos)
+                |> andThen (moveCursorColBy 1 pos)
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        RemoveCharBefore ->
+        ( ActiveCursor pos, RemoveCharBefore ) ->
             let
                 lastColPrevRow =
-                    TextBuffer.lastColumn model.buffer (model.controlCursor.row - 1)
+                    TextBuffer.lastColumn model.buffer (pos.row - 1)
             in
             ( model, Cmd.none )
-                |> andThen backspace
-                |> andThen (cursorLeft lastColPrevRow)
+                |> andThen (backspace pos)
+                |> andThen (cursorLeft lastColPrevRow pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        RemoveCharAfter ->
+        ( ActiveCursor pos, RemoveCharAfter ) ->
             ( model, Cmd.none )
-                |> andThen delete
+                |> andThen (delete pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        NewLine ->
+        ( ActiveCursor pos, NewLine ) ->
             ( model, Cmd.none )
-                |> andThen newline
-                |> andThen (moveCursorRowBy 1)
-                |> andThen (moveCursorColBy -model.controlCursor.col)
+                |> andThen (newline pos)
+                |> andThen (moveCursorRowBy 1 pos)
+                |> andThen (moveCursorColBy -pos.col pos)
                 |> andThen scrollIfNecessary
                 |> andThen calcViewableRegion
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        Blink posix ->
+        ( _, Blink posix ) ->
             if Time.posixToMillis posix - Time.posixToMillis model.lastActive > config.blinkInterval then
                 ( { model | blinker = not model.blinker }, Cmd.none )
 
             else
                 ( { model | blinker = True }, Cmd.none )
 
-        Activity posix ->
+        ( _, Activity posix ) ->
             ( { model | lastActive = posix, blinker = True }, Cmd.none )
 
-        NoOp ->
+        ( _, _ ) ->
             ( model, Cmd.none )
 
 
@@ -404,188 +378,163 @@ andThen fn ( model, cmd ) =
     ( nextModel, Cmd.batch [ cmd, nextCmd ] )
 
 
-moveTo : RowCol -> Model -> ( Model, Cmd Msg )
-moveTo pos model =
-    ( { model
-        | controlCursor = pos
-        , targetCol = pos.col
-      }
-    , Cmd.none
-    )
+setCursor : Cursor -> Model -> ( Model, Cmd Msg )
+setCursor cursor model =
+    case cursor of
+        NoCursor ->
+            ( { model
+                | controlCursor = cursor
+                , targetCol = 0
+              }
+            , Cmd.none
+            )
+
+        ActiveCursor pos ->
+            ( { model
+                | controlCursor = cursor
+                , targetCol = pos.col
+              }
+            , Cmd.none
+            )
+
+        RegionCursor _ ->
+            ( { model
+                | controlCursor = cursor
+                , targetCol = 0
+              }
+            , Cmd.none
+            )
 
 
-trackTo : RowCol -> Model -> ( Model, Cmd Msg )
-trackTo pos model =
-    ( { model | trackingCursor = pos }, Cmd.none )
+trackTo : Cursor -> Model -> ( Model, Cmd Msg )
+trackTo cursor model =
+    ( { model | trackingCursor = cursor }, Cmd.none )
 
 
-moveCursorRowBy : Int -> Model -> ( Model, Cmd Msg )
-moveCursorRowBy val model =
+moveCursorRowBy : Int -> RowCol -> Model -> ( Model, Cmd Msg )
+moveCursorRowBy val pos model =
     let
         newRow =
             clamp
                 0
                 (TextBuffer.lastLine model.buffer)
-                (model.controlCursor.row + val)
+                (pos.row + val)
 
         newCol =
             clamp 0
                 (TextBuffer.lastColumn model.buffer newRow)
-                (max model.controlCursor.col model.targetCol)
+                (max pos.col model.targetCol)
     in
-    ( { model | controlCursor = { row = newRow, col = newCol } }
+    ( { model | controlCursor = ActiveCursor { row = newRow, col = newCol } }
     , Cmd.none
     )
 
 
-moveCursorColBy : Int -> Model -> ( Model, Cmd Msg )
-moveCursorColBy val model =
+moveCursorColBy : Int -> RowCol -> Model -> ( Model, Cmd Msg )
+moveCursorColBy val pos model =
     let
         newCol =
             clamp 0
-                (TextBuffer.lastColumn model.buffer model.controlCursor.row)
-                (model.controlCursor.col + val)
+                (TextBuffer.lastColumn model.buffer pos.row)
+                (pos.col + val)
     in
     ( { model
-        | controlCursor = { row = model.controlCursor.row, col = newCol }
+        | controlCursor = ActiveCursor { row = pos.row, col = newCol }
         , targetCol = newCol
       }
     , Cmd.none
     )
 
 
-cursorLeft : Int -> Model -> ( Model, Cmd Msg )
-cursorLeft lastColPrevRow model =
+cursorLeft : Int -> RowCol -> Model -> ( Model, Cmd Msg )
+cursorLeft lastColPrevRow pos model =
     let
         left =
-            model.controlCursor.col - 1
+            pos.col - 1
 
         cursor =
-            if left < 0 && model.controlCursor.row <= 0 then
+            if left < 0 && pos.row <= 0 then
                 { row = 0, col = 0 }
 
             else if left < 0 then
-                { row = model.controlCursor.row - 1, col = lastColPrevRow }
+                { row = pos.row - 1, col = lastColPrevRow }
 
             else
-                { row = model.controlCursor.row, col = left }
+                { row = pos.row, col = left }
     in
-    ( { model
-        | controlCursor = cursor
-        , targetCol = cursor.col
-      }
+    ( { model | controlCursor = ActiveCursor cursor, targetCol = cursor.col }
     , Cmd.none
     )
 
 
-cursorRight : Model -> ( Model, Cmd Msg )
-cursorRight model =
+cursorRight : RowCol -> Model -> ( Model, Cmd Msg )
+cursorRight pos model =
     let
         right =
-            model.controlCursor.col + 1
+            pos.col + 1
 
         rightMost =
-            TextBuffer.lastColumn model.buffer model.controlCursor.row
+            TextBuffer.lastColumn model.buffer pos.row
 
         cursor =
-            if right > rightMost && model.controlCursor.row >= (TextBuffer.length model.buffer - 1) then
-                model.controlCursor
+            if right > rightMost && pos.row >= (TextBuffer.length model.buffer - 1) then
+                pos
 
             else if right > rightMost then
-                { row = model.controlCursor.row + 1, col = 0 }
+                { row = pos.row + 1, col = 0 }
 
             else
-                { row = model.controlCursor.row, col = right }
+                { row = pos.row, col = right }
     in
-    ( { model
-        | controlCursor = cursor
-        , targetCol = cursor.col
-      }
-    , Cmd.none
-    )
-
-
-refocusBuffer : Model -> ( Model, Cmd Msg )
-refocusBuffer model =
-    ( { model | buffer = TextBuffer.refocus model.controlCursor.row model.controlCursor.col model.buffer }
+    ( { model | controlCursor = ActiveCursor cursor, targetCol = cursor.col }
     , Cmd.none
     )
 
 
 scrollIfNecessary : Model -> ( Model, Cmd Msg )
 scrollIfNecessary model =
-    let
-        ( newScrollRow, scrollCmd ) =
-            if model.controlCursor.row > (model.scrollRow + model.linesPerPage - 3) then
-                let
-                    topRow =
-                        min
-                            (TextBuffer.lastLine model.buffer - model.linesPerPage + 1)
-                            (model.controlCursor.row - model.linesPerPage + 3)
-                in
-                ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight - model.bottomOffset) )
+    case model.controlCursor of
+        NoCursor ->
+            ( model, Cmd.none )
 
-            else if model.controlCursor.row < (model.scrollRow + 2) then
-                let
-                    topRow =
-                        max
-                            0
-                            (model.controlCursor.row - 2)
-                in
-                ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight) )
+        _ ->
+            let
+                pos =
+                    case model.controlCursor of
+                        ActiveCursor scrollPos ->
+                            scrollPos
 
-            else
-                ( model.scrollRow, Cmd.none )
-    in
-    ( { model | scrollRow = newScrollRow }
-    , scrollCmd
-    )
+                        RegionCursor { end } ->
+                            end
 
+                        _ ->
+                            { row = 0, col = 0 }
 
-sanitizeHover : Model -> ( Model, Cmd Msg )
-sanitizeHover model =
-    let
-        hover =
-            case model.hover of
-                NoHover ->
-                    model.hover
+                ( newScrollRow, scrollCmd ) =
+                    if pos.row > (model.scrollRow + model.linesPerPage - 3) then
+                        let
+                            topRow =
+                                min
+                                    (TextBuffer.lastLine model.buffer - model.linesPerPage + 1)
+                                    (pos.row - model.linesPerPage + 3)
+                        in
+                        ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight - model.bottomOffset) )
 
-                HoverLine line ->
-                    HoverLine (clamp 0 (TextBuffer.lastLine model.buffer) line)
+                    else if pos.row < (model.scrollRow + 2) then
+                        let
+                            topRow =
+                                max
+                                    0
+                                    (pos.row - 2)
+                        in
+                        ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight) )
 
-                HoverChar { row, col } ->
-                    let
-                        sanitizedRow =
-                            clamp 0 (TextBuffer.lastLine model.buffer) row
-
-                        sanitizedColumn =
-                            clamp 0 (TextBuffer.lastColumn model.buffer sanitizedRow) col
-                    in
-                    HoverChar
-                        { row = sanitizedRow
-                        , col = sanitizedColumn
-                        }
-    in
-    ( { model | hover = hover }, Cmd.none )
-
-
-cursorToHover : Model -> ( Model, Cmd Msg )
-cursorToHover model =
-    let
-        cursor =
-            case model.hover of
-                NoHover ->
-                    model.controlCursor
-
-                HoverLine row ->
-                    { row = row
-                    , col = TextBuffer.lastColumn model.buffer row
-                    }
-
-                HoverChar position ->
-                    position
-    in
-    ( { model | controlCursor = cursor }, Cmd.none )
+                    else
+                        ( model.scrollRow, Cmd.none )
+            in
+            ( { model | scrollRow = newScrollRow }
+            , scrollCmd
+            )
 
 
 establishViewport : Viewport -> Model -> ( Model, Cmd Msg )
@@ -615,15 +564,11 @@ calcViewableRegion model =
 
         bufferHeight =
             (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
-
-        cursorIndex =
-            model.controlCursor.col
     in
     ( { model
         | startLine = startLine
         , endLine = endLine
         , bufferHeight = bufferHeight
-        , cursorIndex = cursorIndex
       }
     , Cmd.none
     )
@@ -636,77 +581,79 @@ rippleBuffer model =
     )
 
 
-editLine : List TextChange -> Selection -> Model -> ( Model, Cmd Msg )
-editLine textChanges selection model =
-    let
-        modifyCharAt charOffset =
-            List.foldl
-                (\textChange accum ->
-                    case
-                        Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
-                    of
-                        ( _ :: row :: _, Just char ) ->
-                            if row + model.startLine == model.controlCursor.row then
-                                { accum
-                                    | buffer =
-                                        TextBuffer.insertCharAt char
-                                            model.controlCursor.row
-                                            model.controlCursor.col
-                                            accum.buffer
-                                }
-
-                            else
-                                accum
-
-                        _ ->
-                            accum
-                )
-                model
-                textChanges
-    in
-    case selection of
-        NoSelection ->
-            ( model, Cmd.none )
-
-        Range { focusOffset } ->
+editLine : List TextChange -> Cursor -> Selection -> Model -> ( Model, Cmd Msg )
+editLine textChanges cursor selection model =
+    case ( cursor, selection ) of
+        ( ActiveCursor pos, Collapsed { offset } ) ->
             let
-                editedModel =
-                    modifyCharAt focusOffset
-            in
-            ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
+                modifyCharAt charOffset =
+                    List.foldl
+                        (\textChange accum ->
+                            case
+                                Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
+                            of
+                                ( _ :: row :: _, Just char ) ->
+                                    if row + model.startLine == pos.row then
+                                        { accum
+                                            | buffer =
+                                                TextBuffer.insertCharAt char
+                                                    pos.row
+                                                    pos.col
+                                                    accum.buffer
+                                        }
 
-        Collapsed { offset } ->
-            let
+                                    else
+                                        accum
+
+                                _ ->
+                                    accum
+                        )
+                        model
+                        textChanges
+
                 editedModel =
                     modifyCharAt offset
             in
             ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
 
+        ( NoCursor, _ ) ->
+            ( model, Cmd.none )
 
-insertChar : Char -> Model -> ( Model, Cmd Msg )
-insertChar char model =
-    ( { model | buffer = TextBuffer.insertCharAt char model.controlCursor.row model.controlCursor.col model.buffer }
+        ( RegionCursor _, _ ) ->
+            ( model, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+insertChar : Char -> RowCol -> Model -> ( Model, Cmd Msg )
+insertChar char pos model =
+    ( { model | buffer = TextBuffer.insertCharAt char pos.row pos.col model.buffer }
     , Cmd.none
     )
 
 
-newline : Model -> ( Model, Cmd Msg )
-newline model =
-    ( { model | buffer = TextBuffer.breakLine model.controlCursor.row model.controlCursor.col model.buffer }
+newline : RowCol -> Model -> ( Model, Cmd Msg )
+newline pos model =
+    let
+        buffer =
+            TextBuffer.breakLine pos.row pos.col model.buffer
+    in
+    ( { model | buffer = buffer }
     , Cmd.none
     )
 
 
-backspace : Model -> ( Model, Cmd Msg )
-backspace model =
-    ( { model | buffer = TextBuffer.deleteCharBefore model.controlCursor.row model.controlCursor.col model.buffer }
+backspace : RowCol -> Model -> ( Model, Cmd Msg )
+backspace pos model =
+    ( { model | buffer = TextBuffer.deleteCharBefore pos.row pos.col model.buffer }
     , Cmd.none
     )
 
 
-delete : Model -> ( Model, Cmd Msg )
-delete model =
-    ( { model | buffer = TextBuffer.deleteCharAt model.controlCursor.row model.controlCursor.col model.buffer }
+delete : RowCol -> Model -> ( Model, Cmd Msg )
+delete pos model =
+    ( { model | buffer = TextBuffer.deleteCharAt pos.row pos.col model.buffer }
     , Cmd.none
     )
 
@@ -843,21 +790,26 @@ viewCursors model =
 
 viewCursor : Model -> Html Msg
 viewCursor model =
-    let
-        top =
-            String.fromFloat
-                (toFloat model.controlCursor.row * config.lineHeight)
-                ++ "px"
+    case model.controlCursor of
+        ActiveCursor pos ->
+            let
+                top =
+                    String.fromFloat
+                        (toFloat pos.row * config.lineHeight)
+                        ++ "px"
 
-        left =
-            String.fromInt model.controlCursor.col ++ "ch"
-    in
-    H.div
-        [ HA.class "cursor"
-        , HA.style "top" top
-        , HA.style "left" left
-        ]
-        [ H.text "" ]
+                left =
+                    String.fromInt pos.col ++ "ch"
+            in
+            H.div
+                [ HA.class "cursor"
+                , HA.style "top" top
+                , HA.style "left" left
+                ]
+                [ H.text "" ]
+
+        _ ->
+            H.div [] []
 
 
 viewContent : Model -> Html Msg
@@ -881,7 +833,9 @@ viewContent model =
             ]
             [ keyedViewLines model
             , H.node "selection-handler"
-                [ cursorToSelectionProperty model |> HA.property "selection"
+                [ cursorToSelection model.controlCursor model.startLine model.buffer
+                    |> selectionEncoder
+                    |> HA.property "selection"
                 ]
                 []
             ]
@@ -898,11 +852,16 @@ keyedViewLines model =
                         accum
 
                     Just row ->
-                        if model.controlCursor.row == idx then
-                            ( "edit-" ++ String.fromInt model.editKey, viewLine idx row ) :: accum
+                        case model.controlCursor of
+                            ActiveCursor pos ->
+                                if pos.row == idx then
+                                    ( "edit-" ++ String.fromInt model.editKey, viewLine idx row ) :: accum
 
-                        else
-                            ( String.fromInt idx, Html.Lazy.lazy2 viewLine idx row ) :: accum
+                                else
+                                    ( String.fromInt idx, Html.Lazy.lazy2 viewLine idx row ) :: accum
+
+                            _ ->
+                                ( String.fromInt idx, Html.Lazy.lazy2 viewLine idx row ) :: accum
             )
             []
         |> Keyed.node "div" []
@@ -1037,28 +996,47 @@ collapsed fNode fOffset =
 -- Selection and cursor conversion.
 
 
-selectionToRowCol : Model -> Selection -> RowCol
-selectionToRowCol model sel =
+selectionToCursor : Int -> TextBuffer ctx tag -> Selection -> Cursor
+selectionToCursor startLine buffer sel =
     case sel of
         NoSelection ->
-            { row = 0, col = 0 }
+            NoCursor
 
         Collapsed { node, offset } ->
             case node of
                 _ :: row :: child :: _ ->
                     let
                         col =
-                            TextBuffer.getLine row model.buffer
+                            TextBuffer.getLine row buffer
                                 |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
                                 |> Maybe.withDefault 0
                     in
-                    { row = row + model.startLine, col = col }
+                    ActiveCursor { row = row + startLine, col = col }
 
                 _ ->
-                    { row = 0, col = 0 }
+                    NoCursor
 
-        Range _ ->
-            { row = 0, col = 0 }
+        Range { anchorNode, anchorOffset, focusNode, focusOffset } ->
+            case ( anchorNode, focusNode ) of
+                ( _ :: anchorRow :: anchorChild :: _, _ :: focusRow :: focusChild :: _ ) ->
+                    let
+                        anchorCol =
+                            TextBuffer.getLine anchorRow buffer
+                                |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
+                                |> Maybe.withDefault 0
+
+                        focusCol =
+                            TextBuffer.getLine focusRow buffer
+                                |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
+                                |> Maybe.withDefault 0
+                    in
+                    RegionCursor
+                        { start = { row = anchorRow + startLine, col = anchorCol }
+                        , end = { row = focusRow + startLine, col = focusCol }
+                        }
+
+                _ ->
+                    NoCursor
 
 
 pathOffsetToCol : Int -> Int -> List ( tag, String ) -> Int
@@ -1074,21 +1052,58 @@ pathOffsetToCol child offset line =
             pathOffsetToCol (child - 1) (offset + String.length (Tuple.second tl)) tls
 
 
-cursorToSelectionProperty : Model -> Encode.Value
-cursorToSelectionProperty model =
-    let
-        rowcol =
-            model.controlCursor
+cursorToSelection : Cursor -> Int -> TextBuffer ctx tag -> Selection
+cursorToSelection cursor startLine buffer =
+    case cursor of
+        NoCursor ->
+            NoSelection
 
+        ActiveCursor pos ->
+            let
+                sel =
+                    TextBuffer.getLine pos.row buffer
+                        |> Maybe.map (fullPathOffset (pos.row - startLine) pos.col)
+                        |> Maybe.map (\( node, offset ) -> Collapsed { node = node, offset = offset })
+                        |> Maybe.withDefault NoSelection
+            in
+            sel
+
+        RegionCursor { start, end } ->
+            let
+                maybeStartPathOffset =
+                    TextBuffer.getLine start.row buffer
+                        |> Maybe.map (fullPathOffset (start.row - startLine) start.col)
+
+                maybeEndPathOffset =
+                    TextBuffer.getLine end.row buffer
+                        |> Maybe.map (fullPathOffset (end.row - startLine) end.col)
+
+                sel =
+                    case ( maybeStartPathOffset, maybeEndPathOffset ) of
+                        ( Just ( anchorNode, anchorOffset ), Just ( focusNode, focusOffset ) ) ->
+                            Range
+                                { anchorNode = anchorNode
+                                , anchorOffset = anchorOffset
+                                , focusNode = focusNode
+                                , focusOffset = focusOffset
+                                }
+
+                        _ ->
+                            NoSelection
+            in
+            sel
+
+
+fullPathOffset : Int -> Int -> TextBuffer.Line tag ctx -> ( Path, Int )
+fullPathOffset row col line =
+    let
         linePath =
-            [ 0, model.controlCursor.row - model.startLine ]
+            [ 0, row ]
 
         cursorPath =
-            TextBuffer.getLine model.controlCursor.row model.buffer
-                |> Maybe.map (lineToPathOffset model.controlCursor.col)
-                |> Maybe.map (Tuple.mapFirst (List.append linePath))
-                |> Maybe.map (\( node, offset ) -> selectionEncoder (Collapsed { node = node, offset = offset }))
-                |> Maybe.withDefault (selectionEncoder NoSelection)
+            line
+                |> lineToPathOffset col
+                |> Tuple.mapFirst (List.append linePath)
     in
     cursorPath
 
