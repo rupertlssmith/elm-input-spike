@@ -193,8 +193,12 @@ update msg model =
             ( model, initEditorSize )
 
         ( ActiveCursor pos, EditorChange change ) ->
+            let
+                cursor =
+                    selectionToCursor model.startLine model.buffer change.selection
+            in
             ( model, Cmd.none )
-                |> andThen (editLine change.characterDataMutations change.selection)
+                |> andThen (editLine change.characterDataMutations cursor)
                 |> andThen (moveCursorColBy 1 pos)
                 |> andThen rippleBuffer
                 |> andThen activity
@@ -581,52 +585,47 @@ rippleBuffer model =
     )
 
 
-editLine : List TextChange -> Selection -> Model -> ( Model, Cmd Msg )
-editLine textChanges selection model =
-    -- let
-    --     modifyCharAt charOffset =
-    --         List.foldl
-    --             (\textChange accum ->
-    --                 case
-    --                     Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
-    --                 of
-    --                     ( _ :: row :: _, Just char ) ->
-    --                         if row + model.startLine == pos.row then
-    --                             { accum
-    --                                 | buffer =
-    --                                     TextBuffer.insertCharAt char
-    --                                         pos.row
-    --                                         pos.col
-    --                                         accum.buffer
-    --                             }
-    --
-    --                         else
-    --                             accum
-    --
-    --                     _ ->
-    --                         accum
-    --             )
-    --             model
-    --             textChanges
-    -- in
-    -- case selection of
-    --     NoSelection ->
-    --         ( model, Cmd.none )
-    --
-    --     Range { focusOffset } ->
-    --         let
-    --             editedModel =
-    --                 modifyCharAt focusOffset
-    --         in
-    --         ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
-    --
-    --     Collapsed { offset } ->
-    --         let
-    --             editedModel =
-    --                 modifyCharAt offset
-    --         in
-    --         ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
-    Debug.todo "editLine"
+editLine : List TextChange -> Cursor -> Model -> ( Model, Cmd Msg )
+editLine textChanges cursor model =
+    case cursor of
+        NoCursor ->
+            ( model, Cmd.none )
+
+        RegionCursor _ ->
+            ( model, Cmd.none )
+
+        ActiveCursor pos ->
+            -- let
+            --     modifyCharAt charOffset =
+            --         List.foldl
+            --             (\textChange accum ->
+            --                 case
+            --                     Tuple.mapSecond (String.toList >> List.drop (charOffset - 1) >> List.head) textChange
+            --                 of
+            --                     ( _ :: row :: _, Just char ) ->
+            --                         if row + model.startLine == pos.row then
+            --                             { accum
+            --                                 | buffer =
+            --                                     TextBuffer.insertCharAt char
+            --                                         pos.row
+            --                                         pos.col
+            --                                         accum.buffer
+            --                             }
+            --
+            --                         else
+            --                             accum
+            --
+            --                     _ ->
+            --                         accum
+            --             )
+            --             model
+            --             textChanges
+            --
+            --     editedModel =
+            --         modifyCharAt offset
+            -- in
+            -- ( { editedModel | editKey = model.editKey + 1 }, Cmd.none )
+            ( { model | editKey = model.editKey + 1 }, Cmd.none )
 
 
 insertChar : Char -> RowCol -> Model -> ( Model, Cmd Msg )
