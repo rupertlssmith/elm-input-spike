@@ -493,33 +493,48 @@ cursorRight pos model =
 
 scrollIfNecessary : Model -> ( Model, Cmd Msg )
 scrollIfNecessary model =
-    -- let
-    --     ( newScrollRow, scrollCmd ) =
-    --         if pos.row > (model.scrollRow + model.linesPerPage - 3) then
-    --             let
-    --                 topRow =
-    --                     min
-    --                         (TextBuffer.lastLine model.buffer - model.linesPerPage + 1)
-    --                         (pos.row - model.linesPerPage + 3)
-    --             in
-    --             ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight - model.bottomOffset) )
-    --
-    --         else if pos.row < (model.scrollRow + 2) then
-    --             let
-    --                 topRow =
-    --                     max
-    --                         0
-    --                         (pos.row - 2)
-    --             in
-    --             ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight) )
-    --
-    --         else
-    --             ( model.scrollRow, Cmd.none )
-    -- in
-    -- ( { model | scrollRow = newScrollRow }
-    -- , scrollCmd
-    -- )
-    Debug.todo "scrollIfNecessary"
+    case model.controlCursor of
+        NoCursor ->
+            ( model, Cmd.none )
+
+        _ ->
+            let
+                pos =
+                    case model.controlCursor of
+                        ActiveCursor scrollPos ->
+                            scrollPos
+
+                        RegionCursor { end } ->
+                            end
+
+                        _ ->
+                            { row = 0, col = 0 }
+
+                ( newScrollRow, scrollCmd ) =
+                    if pos.row > (model.scrollRow + model.linesPerPage - 3) then
+                        let
+                            topRow =
+                                min
+                                    (TextBuffer.lastLine model.buffer - model.linesPerPage + 1)
+                                    (pos.row - model.linesPerPage + 3)
+                        in
+                        ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight - model.bottomOffset) )
+
+                    else if pos.row < (model.scrollRow + 2) then
+                        let
+                            topRow =
+                                max
+                                    0
+                                    (pos.row - 2)
+                        in
+                        ( topRow, scrollTo ((topRow |> toFloat) * config.lineHeight) )
+
+                    else
+                        ( model.scrollRow, Cmd.none )
+            in
+            ( { model | scrollRow = newScrollRow }
+            , scrollCmd
+            )
 
 
 establishViewport : Viewport -> Model -> ( Model, Cmd Msg )
