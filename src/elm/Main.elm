@@ -61,7 +61,6 @@ type alias Model =
     , linesPerPage : Int
     , startLine : Int
     , endLine : Int
-    , cursorIndex : Int
     , bufferHeight : Float
     , bottomOffset : Float
     , blinker : Bool
@@ -81,7 +80,6 @@ init _ =
       , linesPerPage = 0
       , startLine = 0
       , endLine = 0
-      , cursorIndex = 0
       , bufferHeight = 0.0
       , bottomOffset = 0.0
       , blinker = False
@@ -519,33 +517,28 @@ establishViewport viewport model =
 
 calcViewableRegion : Model -> ( Model, Cmd Msg )
 calcViewableRegion model =
-    -- let
-    --     pad =
-    --         -- Ensure there is always 1 full page above and below for page up and down.
-    --         model.linesPerPage + 1
-    --
-    --     startLine =
-    --         max 0
-    --             ((model.top / config.lineHeight |> floor) - pad)
-    --
-    --     endLine =
-    --         ((model.top + model.height) / config.lineHeight |> floor) + pad
-    --
-    --     bufferHeight =
-    --         (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
-    --
-    --     cursorIndex =
-    --         pos.col
-    -- in
-    -- ( { model
-    --     | startLine = startLine
-    --     , endLine = endLine
-    --     , bufferHeight = bufferHeight
-    --     , cursorIndex = cursorIndex
-    --   }
-    -- , Cmd.none
-    -- )
-    Debug.todo "calcViewableRegion"
+    let
+        pad =
+            -- Ensure there is always 1 full page above and below for page up and down.
+            model.linesPerPage + 1
+
+        startLine =
+            max 0
+                ((model.top / config.lineHeight |> floor) - pad)
+
+        endLine =
+            ((model.top + model.height) / config.lineHeight |> floor) + pad
+
+        bufferHeight =
+            (TextBuffer.length model.buffer |> toFloat) * config.lineHeight
+    in
+    ( { model
+        | startLine = startLine
+        , endLine = endLine
+        , bufferHeight = bufferHeight
+      }
+    , Cmd.none
+    )
 
 
 rippleBuffer : Model -> ( Model, Cmd Msg )
