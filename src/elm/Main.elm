@@ -743,6 +743,9 @@ global =
         , Css.px config.lineHeight |> Css.height
         , Css.borderLeft3 (Css.px 2.5) Css.solid (Css.rgb 90 95 167)
         ]
+    , Css.Global.selector "::selection"
+        [ Css.backgroundColor (Css.rgb 196 195 217)
+        ]
     ]
 
 
