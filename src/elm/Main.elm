@@ -201,8 +201,10 @@ update msg model =
 
         ( _, SelectionChange change ) ->
             let
+                -- _ =
+                --     Debug.log "SelectionChange" change
                 _ =
-                    Debug.log "SelectionChange" change
+                    Debug.log "cursor" cursor
 
                 cursor =
                     selectionToCursor model.startLine model.buffer change.selection
@@ -218,9 +220,13 @@ update msg model =
                     |> andThen (trackTo cursor)
 
         ( _, Scroll scroll ) ->
+            -- let
+            --     _ =
+            --         Debug.log "Scroll" scroll
+            -- in
             ( { model
                 | top = scroll.scrollTop
-                , scrollRow = scroll.scrollTop / config.lineHeight |> round
+                , scrollRow = scroll.scrollTop / config.lineHeight |> round |> Debug.log "scrollRow"
               }
             , Cmd.none
             )
