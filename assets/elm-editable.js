@@ -77,7 +77,6 @@ class ElmEditable extends HTMLElement {
 
   selectionChange(e) {
     let selection = getSelection(this);
-    selection.mousedown = this.mousedown;
 
     let isControlEvent = this.mousedown;
 
