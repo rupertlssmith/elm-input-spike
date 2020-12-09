@@ -562,7 +562,8 @@ calcViewableRegion model =
     let
         pad =
             -- Ensure there is always 1 full page above and below for page up and down.
-            model.linesPerPage + 1
+            -- model.linesPerPage + 1
+            -5
 
         startLine =
             max 0
