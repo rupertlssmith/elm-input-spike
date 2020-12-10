@@ -1053,13 +1053,14 @@ selectionToCursor startLine buffer selection currentCursor =
                                 |> Maybe.withDefault 0
 
                         clippedStart =
-                            ()
+                            if currentRegion.selectionStart.row < startLine then
+                                { row = startLine, col = 0 }
 
-                        clippedEnd =
-                            ()
+                            else
+                                currentRegion.selectionStart
                     in
                     RegionCursor
-                        { start = { row = anchorRow + startLine, col = anchorCol }
+                        { start = clippedStart
                         , end = { row = focusRow + startLine, col = focusCol }
                         , selectionStart = currentRegion.selectionStart
                         , selectionEnd = { row = focusRow + startLine, col = focusCol }
