@@ -199,7 +199,7 @@ update msg model =
                 |> andThen rippleBuffer
                 |> andThen activity
 
-        ( _, SelectionChange change ) ->
+        ( currentCursor, SelectionChange change ) ->
             let
                 -- _ =
                 --     Debug.log "SelectionChange" change
@@ -207,7 +207,7 @@ update msg model =
                     Debug.log "cursor" cursor
 
                 cursor =
-                    selectionToCursor model.startLine model.buffer change.selection
+                    selectionToCursor model.startLine model.buffer change.selection currentCursor
             in
             if change.isControl then
                 ( model, Cmd.none )
@@ -904,12 +904,21 @@ viewLine row line =
 
 
 -- Cursor model.
+-- This is actually a state machine for the whole editor isn't it?
 
 
 type Cursor
     = NoCursor
     | ActiveCursor RowCol
-    | RegionCursor { start : RowCol, end : RowCol }
+    | RegionCursor
+        { -- The control cursor, always clipped to the virtual scroll window.
+          start : RowCol
+        , end : RowCol
+
+        -- The selection within the text model.
+        , selectionStart : RowCol
+        , selectionEnd : RowCol
+        }
 
 
 type alias RowCol =
@@ -1009,13 +1018,13 @@ collapsed fNode fOffset =
 -- Selection and cursor conversion.
 
 
-selectionToCursor : Int -> TextBuffer ctx tag -> Selection -> Cursor
-selectionToCursor startLine buffer sel =
-    case sel of
-        NoSelection ->
+selectionToCursor : Int -> TextBuffer ctx tag -> Selection -> Cursor -> Cursor
+selectionToCursor startLine buffer selection currentCursor =
+    case ( selection |> Debug.log "selection", currentCursor ) of
+        ( NoSelection, _ ) ->
             NoCursor
 
-        Collapsed { node, offset } ->
+        ( Collapsed { node, offset }, _ ) ->
             case node of
                 _ :: row :: child :: _ ->
                     let
@@ -1029,7 +1038,38 @@ selectionToCursor startLine buffer sel =
                 _ ->
                     NoCursor
 
-        Range { anchorNode, anchorOffset, focusNode, focusOffset } ->
+        ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, RegionCursor currentRegion ) ->
+            case ( anchorNode, focusNode ) of
+                ( _ :: anchorRow :: anchorChild :: _, _ :: focusRow :: focusChild :: _ ) ->
+                    let
+                        anchorCol =
+                            TextBuffer.getLine anchorRow buffer
+                                |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
+                                |> Maybe.withDefault 0
+
+                        focusCol =
+                            TextBuffer.getLine focusRow buffer
+                                |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
+                                |> Maybe.withDefault 0
+
+                        clippedStart =
+                            ()
+
+                        clippedEnd =
+                            ()
+                    in
+                    RegionCursor
+                        { start = { row = anchorRow + startLine, col = anchorCol }
+                        , end = { row = focusRow + startLine, col = focusCol }
+                        , selectionStart = currentRegion.selectionStart
+                        , selectionEnd = { row = focusRow + startLine, col = focusCol }
+                        }
+                        |> Debug.log "Updated Selection:"
+
+                _ ->
+                    NoCursor
+
+        ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, _ ) ->
             case ( anchorNode, focusNode ) of
                 ( _ :: anchorRow :: anchorChild :: _, _ :: focusRow :: focusChild :: _ ) ->
                     let
@@ -1046,7 +1086,10 @@ selectionToCursor startLine buffer sel =
                     RegionCursor
                         { start = { row = anchorRow + startLine, col = anchorCol }
                         , end = { row = focusRow + startLine, col = focusCol }
+                        , selectionStart = { row = anchorRow + startLine, col = anchorCol }
+                        , selectionEnd = { row = focusRow + startLine, col = focusCol }
                         }
+                        |> Debug.log "New Selection:"
 
                 _ ->
                     NoCursor
