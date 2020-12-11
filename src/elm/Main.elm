@@ -199,25 +199,41 @@ update msg model =
                 |> andThen rippleBuffer
                 |> andThen activity
 
+        ( RegionCursor region, SelectionChange change ) ->
+            (case change.selection of
+                Range range ->
+                    ( model, Cmd.none )
+                        |> andThen (trackRangeFocus range region.selectionStart)
+
+                Collapsed domPosition ->
+                    ( model, Cmd.none )
+                        |> andThen (trackCollapsedCursor domPosition)
+                        |> andThen activity
+
+                NoSelection ->
+                    ( model, Cmd.none )
+                        |> andThen (trackTo NoCursor)
+            )
+                |> andThen (updateCursorFromControlEvent change.isControl)
+                |> andThen clipCursor
+
         ( currentCursor, SelectionChange change ) ->
-            let
-                -- _ =
-                --     Debug.log "SelectionChange" change
-                _ =
-                    Debug.log "cursor" cursor
+            (case change.selection of
+                Range range ->
+                    ( model, Cmd.none )
+                        |> andThen (trackNewRange range)
 
-                cursor =
-                    selectionToCursor model.startLine model.buffer change.selection currentCursor
-            in
-            if change.isControl then
-                ( model, Cmd.none )
-                    |> andThen (trackTo cursor)
-                    |> andThen (setCursor cursor)
-                    |> andThen activity
+                Collapsed domPosition ->
+                    ( model, Cmd.none )
+                        |> andThen (trackCollapsedCursor domPosition)
+                        |> andThen activity
 
-            else
-                ( model, Cmd.none )
-                    |> andThen (trackTo cursor)
+                NoSelection ->
+                    ( model, Cmd.none )
+                        |> andThen (trackTo NoCursor)
+            )
+                |> andThen (updateCursorFromControlEvent change.isControl)
+                |> andThen clipCursor
 
         ( _, Scroll scroll ) ->
             -- let
@@ -231,6 +247,7 @@ update msg model =
             , Cmd.none
             )
                 |> andThen calcViewableRegion
+                |> andThen clipCursor
 
         ( _, StartSelecting ) ->
             ( model, Cmd.none )
@@ -413,11 +430,6 @@ setCursor cursor model =
               }
             , Cmd.none
             )
-
-
-trackTo : Cursor -> Model -> ( Model, Cmd Msg )
-trackTo cursor model =
-    ( { model | trackingCursor = cursor }, Cmd.none )
 
 
 moveCursorRowBy : Int -> RowCol -> Model -> ( Model, Cmd Msg )
@@ -698,6 +710,78 @@ scrollTo pos =
     Browser.Dom.setViewportOf "editor-main" 0.0 pos |> Task.attempt (always NoOp)
 
 
+trackTo : Cursor -> Model -> ( Model, Cmd Msg )
+trackTo cursor model =
+    ( { model | trackingCursor = cursor }, Cmd.none )
+
+
+trackCollapsedCursor : { offset : Int, node : Path } -> Model -> ( Model, Cmd Msg )
+trackCollapsedCursor domPosition model =
+    trackTo
+        (domPositionToCursor
+            model.startLine
+            model.buffer
+            domPosition.node
+            domPosition.offset
+        )
+        model
+
+
+trackNewRange :
+    { anchorOffset : Int, anchorNode : Path, focusOffset : Int, focusNode : Path }
+    -> Model
+    -> ( Model, Cmd Msg )
+trackNewRange range model =
+    trackTo
+        (newRangeCursor
+            model.startLine
+            model.buffer
+            range.anchorNode
+            range.anchorOffset
+            range.focusNode
+            range.focusOffset
+        )
+        model
+
+
+trackRangeFocus :
+    { anchorOffset : Int, anchorNode : Path, focusOffset : Int, focusNode : Path }
+    -> RowCol
+    -> Model
+    -> ( Model, Cmd Msg )
+trackRangeFocus range selectionStart model =
+    trackTo
+        (moveFocusOfRangeCursor
+            model.startLine
+            model.buffer
+            range.focusNode
+            range.focusOffset
+            selectionStart
+        )
+        model
+
+
+clipCursor : Model -> ( Model, Cmd Msg )
+clipCursor model =
+    -- clippedStart =
+    --     if currentRegion.selectionStart.row < startLine then
+    --         { row = startLine, col = 0 }
+    --
+    --     else
+    --         currentRegion.selectionStart
+    ( model, Cmd.none )
+
+
+updateCursorFromControlEvent : Bool -> Model -> ( Model, Cmd Msg )
+updateCursorFromControlEvent isControl model =
+    if isControl then
+        ( model, Cmd.none )
+            |> andThen (setCursor model.trackingCursor)
+
+    else
+        ( model, Cmd.none )
+
+
 
 -- Styling
 
@@ -951,6 +1035,21 @@ type alias Path =
 
 selectionDecoder : Decode.Decoder Selection
 selectionDecoder =
+    let
+        range aNode aOffset fNode fOffset =
+            Range
+                { anchorOffset = aOffset
+                , anchorNode = aNode
+                , focusOffset = fOffset
+                , focusNode = fNode
+                }
+
+        collapsed fNode fOffset =
+            Collapsed
+                { offset = fOffset
+                , node = fNode
+                }
+    in
     Decode.at [ "selection" ] Decode.string
         |> Decode.andThen
             (\tag ->
@@ -996,104 +1095,101 @@ selectionEncoder sel =
                 |> Encode.object
 
 
-range : Path -> Int -> Path -> Int -> Selection
-range aNode aOffset fNode fOffset =
-    Range
-        { anchorOffset = aOffset
-        , anchorNode = aNode
-        , focusOffset = fOffset
-        , focusNode = fNode
-        }
-
-
-collapsed : Path -> Int -> Selection
-collapsed fNode fOffset =
-    Collapsed
-        { offset = fOffset
-        , node = fNode
-        }
-
-
 
 -- Selection and cursor conversion.
 
 
-selectionToCursor : Int -> TextBuffer ctx tag -> Selection -> Cursor -> Cursor
-selectionToCursor startLine buffer selection currentCursor =
-    case ( selection |> Debug.log "selection", currentCursor ) of
-        ( NoSelection, _ ) ->
+domPositionToCursor : Int -> TextBuffer ctx tag -> Path -> Int -> Cursor
+domPositionToCursor startLine buffer node offset =
+    case node of
+        _ :: row :: child :: _ ->
+            let
+                col =
+                    TextBuffer.getLine row buffer
+                        |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
+                        |> Maybe.withDefault 0
+            in
+            ActiveCursor { row = row + startLine, col = col }
+
+        _ ->
             NoCursor
 
-        ( Collapsed { node, offset }, _ ) ->
-            case node of
-                _ :: row :: child :: _ ->
-                    let
-                        col =
-                            TextBuffer.getLine row buffer
-                                |> Maybe.map (\line -> pathOffsetToCol child offset line.tagged)
-                                |> Maybe.withDefault 0
-                    in
-                    ActiveCursor { row = row + startLine, col = col }
 
-                _ ->
-                    NoCursor
+newRangeCursor : Int -> TextBuffer ctx tag -> Path -> Int -> Path -> Int -> Cursor
+newRangeCursor startLine buffer anchorNode anchorOffset focusNode focusOffset =
+    case ( anchorNode, focusNode ) of
+        ( _ :: anchorRow :: anchorChild :: _, _ :: focusRow :: focusChild :: _ ) ->
+            let
+                anchorCol =
+                    TextBuffer.getLine anchorRow buffer
+                        |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
+                        |> Maybe.withDefault 0
 
-        ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, RegionCursor currentRegion ) ->
-            case ( anchorNode, focusNode ) of
-                ( _ :: anchorRow :: anchorChild :: _, _ :: focusRow :: focusChild :: _ ) ->
-                    let
-                        anchorCol =
-                            TextBuffer.getLine anchorRow buffer
-                                |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
-                                |> Maybe.withDefault 0
+                focusCol =
+                    TextBuffer.getLine focusRow buffer
+                        |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
+                        |> Maybe.withDefault 0
+            in
+            RegionCursor
+                { start = { row = anchorRow + startLine, col = anchorCol }
+                , end = { row = focusRow + startLine, col = focusCol }
+                , selectionStart = { row = anchorRow + startLine, col = anchorCol }
+                , selectionEnd = { row = focusRow + startLine, col = focusCol }
+                }
+                |> Debug.log "New Selection:"
 
-                        focusCol =
-                            TextBuffer.getLine focusRow buffer
-                                |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
-                                |> Maybe.withDefault 0
+        _ ->
+            NoCursor
 
-                        clippedStart =
-                            if currentRegion.selectionStart.row < startLine then
-                                { row = startLine, col = 0 }
 
-                            else
-                                currentRegion.selectionStart
-                    in
-                    RegionCursor
-                        { start = clippedStart
-                        , end = { row = focusRow + startLine, col = focusCol }
-                        , selectionStart = currentRegion.selectionStart
-                        , selectionEnd = { row = focusRow + startLine, col = focusCol }
-                        }
-                        |> Debug.log "Updated Selection:"
+moveFocusOfRangeCursor : Int -> TextBuffer ctx tag -> Path -> Int -> RowCol -> Cursor
+moveFocusOfRangeCursor startLine buffer focusNode focusOffset selectionStart =
+    case focusNode of
+        _ :: focusRow :: focusChild :: _ ->
+            let
+                -- anchorCol =
+                --     TextBuffer.getLine anchorRow buffer
+                --         |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
+                --         |> Maybe.withDefault 0
+                focusCol =
+                    TextBuffer.getLine focusRow buffer
+                        |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
+                        |> Maybe.withDefault 0
 
-                _ ->
-                    NoCursor
+                clippedStart =
+                    if selectionStart.row < startLine then
+                        { row = startLine, col = 0 }
 
-        ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, _ ) ->
-            case ( anchorNode, focusNode ) of
-                ( _ :: anchorRow :: anchorChild :: _, _ :: focusRow :: focusChild :: _ ) ->
-                    let
-                        anchorCol =
-                            TextBuffer.getLine anchorRow buffer
-                                |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
-                                |> Maybe.withDefault 0
+                    else
+                        selectionStart
+            in
+            RegionCursor
+                { start = clippedStart
+                , end = { row = focusRow + startLine, col = focusCol }
+                , selectionStart = selectionStart
+                , selectionEnd = { row = focusRow + startLine, col = focusCol }
+                }
+                |> Debug.log "Updated Selection:"
 
-                        focusCol =
-                            TextBuffer.getLine focusRow buffer
-                                |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
-                                |> Maybe.withDefault 0
-                    in
-                    RegionCursor
-                        { start = { row = anchorRow + startLine, col = anchorCol }
-                        , end = { row = focusRow + startLine, col = focusCol }
-                        , selectionStart = { row = anchorRow + startLine, col = anchorCol }
-                        , selectionEnd = { row = focusRow + startLine, col = focusCol }
-                        }
-                        |> Debug.log "New Selection:"
+        _ ->
+            NoCursor
 
-                _ ->
-                    NoCursor
+
+
+-- selectionToCursor : Int -> TextBuffer ctx tag -> Selection -> Cursor -> Cursor
+-- selectionToCursor startLine buffer selection currentCursor =
+--     case ( selection |> Debug.log "selection", currentCursor ) of
+--         ( NoSelection, _ ) ->
+--             NoCursor
+--
+--         ( Collapsed { node, offset }, _ ) ->
+--             domPositionToCursor startLine buffer node offset
+--
+--         ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, RegionCursor currentRegion ) ->
+--             moveFocusOfRangeCursor startLine buffer focusNode focusOffset currentRegion
+--
+--         ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, _ ) ->
+--             newRangeCursor startLine buffer anchorNode anchorOffset focusNode focusOffset
 
 
 pathOffsetToCol : Int -> Int -> List ( tag, String ) -> Int
