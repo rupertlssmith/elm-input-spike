@@ -745,7 +745,7 @@ trackNewRange range model =
 
 
 trackRangeFocus :
-    { anchorOffset : Int, anchorNode : Path, focusOffset : Int, focusNode : Path }
+    { a | focusOffset : Int, focusNode : Path }
     -> RowCol
     -> Model
     -> ( Model, Cmd Msg )
@@ -789,8 +789,7 @@ clipCursor model =
 updateCursorFromControlEvent : Bool -> Model -> ( Model, Cmd Msg )
 updateCursorFromControlEvent isControl model =
     if isControl then
-        ( model, Cmd.none )
-            |> andThen (setCursor model.trackingCursor)
+        setCursor model.trackingCursor model
 
     else
         ( model, Cmd.none )
