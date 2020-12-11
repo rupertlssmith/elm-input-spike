@@ -763,13 +763,27 @@ trackRangeFocus range selectionStart model =
 
 clipCursor : Model -> ( Model, Cmd Msg )
 clipCursor model =
-    -- clippedStart =
-    --     if currentRegion.selectionStart.row < startLine then
-    --         { row = startLine, col = 0 }
-    --
-    --     else
-    --         currentRegion.selectionStart
-    ( model, Cmd.none )
+    let
+        cursor =
+            case model.controlCursor of
+                NoCursor ->
+                    NoCursor
+
+                ActiveCursor pos ->
+                    ActiveCursor pos
+
+                RegionCursor region ->
+                    let
+                        clippedStart =
+                            if region.selectionStart.row < model.startLine then
+                                { row = model.startLine, col = 0 }
+
+                            else
+                                region.selectionStart
+                    in
+                    RegionCursor { region | start = clippedStart }
+    in
+    ( { model | controlCursor = cursor }, Cmd.none )
 
 
 updateCursorFromControlEvent : Bool -> Model -> ( Model, Cmd Msg )
