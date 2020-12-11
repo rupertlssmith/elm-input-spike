@@ -35,7 +35,7 @@ config =
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
     , lineLength = 120
-    , numLines = 10000
+    , numLines = 100
     , blinkInterval = 400
     }
 
@@ -780,8 +780,19 @@ clipCursor model =
 
                             else
                                 region.selectionStart
+
+                        clippedEnd =
+                            if region.selectionEnd.row >= model.endLine then
+                                { row = model.endLine, col = 0 }
+
+                            else
+                                region.selectionEnd
                     in
-                    RegionCursor { region | start = clippedStart }
+                    RegionCursor
+                        { region
+                            | start = clippedStart
+                            , end = clippedEnd
+                        }
     in
     ( { model | controlCursor = cursor }, Cmd.none )
 
