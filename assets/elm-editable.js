@@ -6,7 +6,6 @@ class ElmEditable extends HTMLElement {
     this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
     this._observer = new MutationObserver(this.mutationObserverCallback);
     this.selectionChange = this.selectionChange.bind(this);
-    this.selectStart = this.selectStart.bind(this);
     this.mousedownCallback = this.mousedownCallback.bind(this);
     this.mouseupCallback = this.mouseupCallback.bind(this);
 
@@ -17,7 +16,6 @@ class ElmEditable extends HTMLElement {
     this.addEventListener("mousedown", this.mousedownCallback);
     this.addEventListener("mouseup", this.mouseupCallback);
     document.addEventListener("selectionchange", this.selectionChange);
-    document.addEventListener("selectstart", this.selectStart);
 
     this._observer.observe(this, {
       characterDataOldValue: true,
@@ -78,7 +76,6 @@ class ElmEditable extends HTMLElement {
   }
 
   selectionChange(e) {
-    console.log("selectionChange");
     let selection = getSelection(this);
 
     let isControlEvent = this.mousedown;
@@ -94,19 +91,11 @@ class ElmEditable extends HTMLElement {
     this.dispatchEvent(event);
   };
 
-  selectStart(e) {
-    console.log("selectStart");
-    console.log(e);
-  }
-
-
   mousedownCallback(e) {
-    console.log("mousedown");
     this.mousedown = true;
   }
 
   mouseupCallback(e) {
-    console.log("mouseup");
     this.mousedown = false;
   }
 }
@@ -118,10 +107,13 @@ class SelectionHandler extends HTMLElement {
   }
 
   set selection(newValue) {
-    if (!equalSelection(this.sel, newValue)) {
-      this.sel = newValue;
-      setSelection(this.parentNode, newValue);
-    }
+    // if (!equalSelection(this.sel, newValue)) {
+    //   this.sel = newValue;
+    //   setSelection(this.parentNode, newValue);
+    // }
+
+    this.sel = newValue;
+    setSelection(this.parentNode, newValue);
   }
 
   get selection() {
@@ -197,6 +189,7 @@ let setSelection = (node, selection) => {
 
     anchorOffset = selection.anchorOffset;
     anchorNode = findNodeFromPath(selection.anchorNode, node);
+    console.log(anchorNode);
   }
 
   if (focusNode && anchorNode) {
@@ -207,7 +200,8 @@ let setSelection = (node, selection) => {
 
     try {
       sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
-    } catch (e) {}
+    } catch (e) {
+    }
   }
 }
 
