@@ -107,13 +107,10 @@ class SelectionHandler extends HTMLElement {
   }
 
   set selection(newValue) {
-    // if (!equalSelection(this.sel, newValue)) {
-    //   this.sel = newValue;
-    //   setSelection(this.parentNode, newValue);
-    // }
-
-    this.sel = newValue;
-    setSelection(this.parentNode, newValue);
+    if (!equalSelection(this.sel, newValue)) {
+       this.sel = newValue;
+       setSelection(this.parentNode, newValue);
+    }
   }
 
   get selection() {
@@ -308,6 +305,9 @@ let equalSelection = (sel1, sel2) => {
     return false;
 
   if (sel1.selection != sel2.selection)
+    return false;
+
+  if (sel1.startLine != sel2.startLine)
     return false;
 
   if (sel1.selection == "collapsed") {

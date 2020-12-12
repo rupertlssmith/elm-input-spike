@@ -951,7 +951,7 @@ viewContent model =
             [ keyedViewLines model
             , H.node "selection-handler"
                 [ cursorToSelection model.controlCursor model.startLine model.buffer
-                    |> selectionEncoder
+                    |> selectionEncoder model.startLine
                     |> HA.property "selection"
                 ]
                 []
@@ -1091,15 +1091,18 @@ selectionDecoder =
             )
 
 
-selectionEncoder : Selection -> Encode.Value
-selectionEncoder sel =
+selectionEncoder : Int -> Selection -> Encode.Value
+selectionEncoder startLine sel =
     case sel of
         NoSelection ->
-            [ ( "selection", Encode.string "noselection" ) ]
+            [ ( "selection", Encode.string "noselection" )
+            , ( "startLine", Encode.int startLine )
+            ]
                 |> Encode.object
 
         Collapsed val ->
             [ ( "selection", Encode.string "collapsed" )
+            , ( "startLine", Encode.int startLine )
             , ( "node", Encode.list Encode.int val.node )
             , ( "offset", Encode.int val.offset )
             ]
@@ -1107,6 +1110,7 @@ selectionEncoder sel =
 
         Range val ->
             [ ( "selection", Encode.string "range" )
+            , ( "startLine", Encode.int startLine )
             , ( "anchorNode", Encode.list Encode.int val.anchorNode )
             , ( "anchorOffset", Encode.int val.anchorOffset )
             , ( "focusNode", Encode.list Encode.int val.focusNode )
