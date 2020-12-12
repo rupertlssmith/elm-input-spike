@@ -35,7 +35,7 @@ config =
     , lineHeightRatio = lineHeightRatio
     , lineHeight = (lineHeightRatio * fontSize) |> floor |> toFloat
     , lineLength = 120
-    , numLines = 100
+    , numLines = 10000
     , blinkInterval = 400
     }
 
@@ -236,13 +236,9 @@ update msg model =
                 |> andThen clipCursor
 
         ( _, Scroll scroll ) ->
-            -- let
-            --     _ =
-            --         Debug.log "Scroll" scroll
-            -- in
             ( { model
                 | top = scroll.scrollTop
-                , scrollRow = scroll.scrollTop / config.lineHeight |> round |> Debug.log "scrollRow"
+                , scrollRow = scroll.scrollTop / config.lineHeight |> round
               }
             , Cmd.none
             )
@@ -574,8 +570,7 @@ calcViewableRegion model =
     let
         pad =
             -- Ensure there is always 1 full page above and below for page up and down.
-            -- model.linesPerPage + 1
-            -5
+            model.linesPerPage + 1
 
         startLine =
             max 0
@@ -1160,7 +1155,6 @@ newRangeCursor startLine buffer anchorNode anchorOffset focusNode focusOffset =
                 , selectionStart = { row = anchorRow + startLine, col = anchorCol }
                 , selectionEnd = { row = focusRow + startLine, col = focusCol }
                 }
-                |> Debug.log "New Selection:"
 
         _ ->
             NoCursor
@@ -1171,10 +1165,6 @@ moveFocusOfRangeCursor startLine buffer focusNode focusOffset selectionStart =
     case focusNode of
         _ :: focusRow :: focusChild :: _ ->
             let
-                -- anchorCol =
-                --     TextBuffer.getLine anchorRow buffer
-                --         |> Maybe.map (\line -> pathOffsetToCol anchorChild anchorOffset line.tagged)
-                --         |> Maybe.withDefault 0
                 focusCol =
                     TextBuffer.getLine focusRow buffer
                         |> Maybe.map (\line -> pathOffsetToCol focusChild focusOffset line.tagged)
@@ -1193,27 +1183,9 @@ moveFocusOfRangeCursor startLine buffer focusNode focusOffset selectionStart =
                 , selectionStart = selectionStart
                 , selectionEnd = { row = focusRow + startLine, col = focusCol }
                 }
-                |> Debug.log "Updated Selection:"
 
         _ ->
             NoCursor
-
-
-
--- selectionToCursor : Int -> TextBuffer ctx tag -> Selection -> Cursor -> Cursor
--- selectionToCursor startLine buffer selection currentCursor =
---     case ( selection |> Debug.log "selection", currentCursor ) of
---         ( NoSelection, _ ) ->
---             NoCursor
---
---         ( Collapsed { node, offset }, _ ) ->
---             domPositionToCursor startLine buffer node offset
---
---         ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, RegionCursor currentRegion ) ->
---             moveFocusOfRangeCursor startLine buffer focusNode focusOffset currentRegion
---
---         ( Range { anchorNode, anchorOffset, focusNode, focusOffset }, _ ) ->
---             newRangeCursor startLine buffer anchorNode anchorOffset focusNode focusOffset
 
 
 pathOffsetToCol : Int -> Int -> List ( tag, String ) -> Int
