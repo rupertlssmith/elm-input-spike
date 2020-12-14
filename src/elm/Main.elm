@@ -171,6 +171,7 @@ type Msg
     | Blink Posix
     | Activity Posix
     | NoOp
+    | InputMsg InputEvent
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -386,6 +387,13 @@ update msg model =
 
         ( _, Activity posix ) ->
             ( { model | lastActive = posix, blinker = True }, Cmd.none )
+
+        ( _, InputMsg evt ) ->
+            let
+                _ =
+                    Debug.log "InputMsg" evt
+            in
+            ( model, Cmd.none )
 
         ( _, _ ) ->
             ( model, Cmd.none )
@@ -947,6 +955,10 @@ viewContent model =
             , HA.attribute "spellcheck" "false"
             , HA.attribute "autocorrect" "off"
             , HA.attribute "autocapitalize" "off"
+            , HE.on "beforeinput" beforeInputDecoder
+
+            --, HE.on "input" beforeInputDecoder
+            --, HE.on "pastewithdata" pasteWithDataDecoder
             ]
             [ keyedViewLines model
             , H.node "selection-handler"
@@ -1461,6 +1473,26 @@ scrollDecoder =
         |> andMap (Decode.at [ "target", "scrollLeft" ] Decode.float)
         |> andMap (Decode.at [ "target", "scrollWidth" ] Decode.float)
         |> Decode.map Scroll
+
+
+
+-- Editor input events.
+
+
+type alias InputEvent =
+    { data : Maybe String
+    , isComposing : Bool
+    , inputType : String
+    }
+
+
+beforeInputDecoder : Decoder Msg
+beforeInputDecoder =
+    Decode.succeed InputEvent
+        |> andMap (Decode.maybe (Decode.field "data" Decode.string))
+        |> andMap (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
+        |> andMap (Decode.field "inputType" Decode.string)
+        |> Decode.map InputMsg
 
 
 
