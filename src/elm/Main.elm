@@ -154,6 +154,9 @@ type Msg
     | Scroll ScrollEvent
     | StartSelecting
     | StopSelecting
+    | Cut ()
+    | Copy ()
+    | Paste PasteEvent
     | MoveUp
     | MoveDown
     | MoveLeft
@@ -172,7 +175,6 @@ type Msg
     | Activity Posix
     | NoOp
     | InputMsg InputEvent
-    | Paste PasteEvent
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -251,6 +253,27 @@ update msg model =
             ( model, Cmd.none )
 
         ( _, StopSelecting ) ->
+            ( model, Cmd.none )
+
+        ( _, Cut evt ) ->
+            let
+                _ =
+                    Debug.log "Cut" evt
+            in
+            ( model, Cmd.none )
+
+        ( _, Copy evt ) ->
+            let
+                _ =
+                    Debug.log "Copy" evt
+            in
+            ( model, Cmd.none )
+
+        ( _, Paste evt ) ->
+            let
+                _ =
+                    Debug.log "Paste" evt
+            in
             ( model, Cmd.none )
 
         ( ActiveCursor pos, MoveUp ) ->
@@ -957,6 +980,8 @@ viewContent model =
             , HA.attribute "autocorrect" "off"
             , HA.attribute "autocapitalize" "off"
             , HE.on "beforeinput" beforeInputDecoder
+            , HE.preventDefaultOn "cut" (( Cut (), True ) |> Decode.succeed)
+            , HE.preventDefaultOn "copy" (( Copy (), True ) |> Decode.succeed)
             , HE.on "pastewithdata" pasteWithDataDecoder
             ]
             [ keyedViewLines model
@@ -1436,7 +1461,7 @@ keyToMsg keyEvent =
 
 
 
--- Editor paste events.
+-- Editor cut/copy/paste events.
 
 
 type alias PasteEvent =

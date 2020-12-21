@@ -8,6 +8,7 @@ class ElmEditable extends HTMLElement {
     this.selectionChange = this.selectionChange.bind(this);
     this.mousedownCallback = this.mousedownCallback.bind(this);
     this.mouseupCallback = this.mouseupCallback.bind(this);
+    this.pasteCallback = this.pasteCallback.bind(this);
 
     this.mousedown = false;
   }
@@ -16,6 +17,7 @@ class ElmEditable extends HTMLElement {
     this.addEventListener("mousedown", this.mousedownCallback);
     this.addEventListener("mouseup", this.mouseupCallback);
     document.addEventListener("selectionchange", this.selectionChange);
+    this.addEventListener("paste", this.pasteCallback);
 
     this._observer.observe(this, {
       characterDataOldValue: true,
@@ -33,6 +35,7 @@ class ElmEditable extends HTMLElement {
     this.removeEventListener("mousedown", this.mousedownCallback);
     this.removeEventListener("mouseup", this.mouseupCallback);
     document.removeEventListener("selectionchange", this.selectionChange)
+    this.removeEventListener("paste", this.pasteCallback);
     this._observer.disconnect();
   }
 
@@ -98,6 +101,22 @@ class ElmEditable extends HTMLElement {
   mouseupCallback(e) {
     this.mousedown = false;
   }
+
+  pasteCallback(e) {
+    e.preventDefault();
+
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const text = clipboardData.getData('text') || "";
+    const html = clipboardData.getData('text/html') || "";
+    const newEvent = new CustomEvent("pastewithdata", {
+      detail: {
+        text: text,
+        html: html
+      }
+    });
+
+    this.dispatchEvent(newEvent)
+  }
 }
 
 class SelectionHandler extends HTMLElement {
@@ -108,8 +127,8 @@ class SelectionHandler extends HTMLElement {
 
   set selection(newValue) {
     if (!equalSelection(this.sel, newValue)) {
-       this.sel = newValue;
-       setSelection(this.parentNode, newValue);
+      this.sel = newValue;
+      setSelection(this.parentNode, newValue);
     }
   }
 
@@ -197,8 +216,7 @@ let setSelection = (node, selection) => {
 
     try {
       sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 }
 
