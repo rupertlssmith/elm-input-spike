@@ -172,6 +172,7 @@ type Msg
     | Activity Posix
     | NoOp
     | InputMsg InputEvent
+    | Paste PasteEvent
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -956,9 +957,7 @@ viewContent model =
             , HA.attribute "autocorrect" "off"
             , HA.attribute "autocapitalize" "off"
             , HE.on "beforeinput" beforeInputDecoder
-
-            --, HE.on "input" beforeInputDecoder
-            --, HE.on "pastewithdata" pasteWithDataDecoder
+            , HE.on "pastewithdata" pasteWithDataDecoder
             ]
             [ keyedViewLines model
             , H.node "selection-handler"
@@ -1446,11 +1445,12 @@ type alias PasteEvent =
     }
 
 
-pasteWithDataDecoder : Decoder PasteEvent
+pasteWithDataDecoder : Decoder Msg
 pasteWithDataDecoder =
     Decode.succeed PasteEvent
         |> andMap (Decode.at [ "detail", "text" ] Decode.string)
         |> andMap (Decode.at [ "detail", "html" ] Decode.string)
+        |> Decode.map Paste
 
 
 
