@@ -267,6 +267,11 @@ insertCharAt char row col buffer =
     }
 
 
+insertStringAt : Char -> Int -> Int -> TextBuffer tag ctx -> TextBuffer tag ctx
+insertStringAt char row col buffer =
+    buffer
+
+
 deleteCharBefore : Int -> Int -> TextBuffer tag ctx -> TextBuffer tag ctx
 deleteCharBefore row col buffer =
     let
@@ -491,6 +496,16 @@ clampColumn buffer line column =
 getLine : Int -> TextBuffer tag ctx -> Maybe (Line tag ctx)
 getLine lineNum buffer =
     GapBuffer.get lineNum buffer.lines
+
+
+getRegion : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> Maybe (List (Line tag ctx))
+getRegion fromRow fromCol toRow toCol buffer =
+    Nothing
+
+
+deleteRegion : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> TextBuffer tax ctx
+deleteRegion fromRow fromCol toRow toCol buffer =
+    buffer
 
 
 lineLength : Int -> TextBuffer tag ctx -> Int

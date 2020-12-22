@@ -257,14 +257,14 @@ update msg model =
         ( _, StopSelecting ) ->
             ( model, Cmd.none )
 
-        ( _, Cut evt ) ->
+        ( RegionCursor region, Cut evt ) ->
             let
                 _ =
                     Debug.log "Cut" evt
             in
             ( model, Cmd.none )
 
-        ( _, Copy evt ) ->
+        ( RegionCursor region, Copy evt ) ->
             let
                 _ =
                     Debug.log "Copy" evt
