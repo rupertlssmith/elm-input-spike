@@ -140,7 +140,6 @@ class SelectionHandler extends HTMLElement {
 customElements.define('elm-editable', ElmEditable);
 customElements.define('selection-handler', SelectionHandler);
 
-
 let getSelection = (node) => {
   const noSelection = {
     "selection": "noselection"
