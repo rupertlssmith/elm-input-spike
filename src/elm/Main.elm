@@ -269,7 +269,7 @@ update msg model =
                 _ =
                     Debug.log "Copy" evt
             in
-            ( model, Cmd.none )
+            ( model, Ports.Clipboard.toClipboard "hello" )
 
         ( _, Paste evt ) ->
             let
