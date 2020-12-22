@@ -4,6 +4,7 @@ import Array exposing (Array)
 import Browser exposing (Document)
 import Browser.Dom exposing (Viewport)
 import Browser.Events
+import Clipboard
 import Css
 import Css.Global
 import GapBuffer
@@ -15,6 +16,7 @@ import Html.Lazy
 import Html.Styled
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
+import Ports.Clipboard
 import Random exposing (Generator, Seed)
 import Random.Array
 import Regex exposing (Regex)
