@@ -558,14 +558,13 @@ foldlLines fn init buffer =
 
 
 foldlSliceLines : (Int -> Line tag ctx -> a -> a) -> a -> Int -> Int -> TextBuffer tag ctx -> a
-foldlSliceLines fn init buffer r1 r2 =
-    -- GapBuffer.foldlSlice
-    --     (\_ line acc -> fn line acc)
-    --     init
-    --     0
-    --     (GapBuffer.length buffer.lines)
-    --     buffer.lines
-    Debug.todo "foldlSliceLines"
+foldlSliceLines fn init r1 r2 buffer =
+    GapBuffer.foldlSlice
+        (\idx line acc -> fn idx line acc)
+        init
+        r1
+        r2
+        buffer.lines
 
 
 
