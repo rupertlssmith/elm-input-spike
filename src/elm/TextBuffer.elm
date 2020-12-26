@@ -364,35 +364,6 @@ deleteCharAt row col buffer =
 -- Get the contents from a buffer.
 --
 --
--- range : Int -> Int -> Int -> Int -> (TextBuffer tag ctx) -> String
--- range r1 c1 r2 c2 buffer =
---     let
---         numberOfLines =
---             r2 - r1 + 1
---     in
---     buffer
---         |> toList
---         |> List.drop r1
---         |> List.take numberOfLines
---         |> List.indexedMap
---             (\i line ->
---                 if numberOfLines == 1 then
---                     line
---                         |> String.dropLeft c1
---                         |> String.left (c2 - c1 + 1)
---
---                 else if i == 0 then
---                     String.dropLeft c1 line
---
---                 else if i == numberOfLines - 1 then
---                     String.left (c2 + 1) line
---
---                 else
---                     line
---             )
---         |> String.join "\n"
---
---
 -- charAt : Int -> Int -> TextBuffer tag ctx -> String
 -- charAt line column buffer =
 --     getLine line buffer
@@ -518,7 +489,34 @@ getLineRangeAsString lineNum fromCol toCol buffer =
 
 
 getRegionAsString : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> String
-getRegionAsString fromRow fromCol toRow toCol buffer =
+getRegionAsString r1 c1 r2 c2 buffer =
+    -- Old algorithm - looks innefficent.
+    -- Use an indexed foldl over the buffer instead.
+    --     let
+    --         numberOfLines =
+    --             r2 - r1 + 1
+    --     in
+    --     buffer
+    --         |> toList
+    --         |> List.drop r1
+    --         |> List.take numberOfLines
+    --         |> List.indexedMap
+    --             (\i line ->
+    --                 if numberOfLines == 1 then
+    --                     line
+    --                         |> String.dropLeft c1
+    --                         |> String.left (c2 - c1 + 1)
+    --
+    --                 else if i == 0 then
+    --                     String.dropLeft c1 line
+    --
+    --                 else if i == numberOfLines - 1 then
+    --                     String.left (c2 + 1) line
+    --
+    --                 else
+    --                     line
+    --             )
+    --         |> String.join "\n"
     Debug.todo "getRegionAsString"
 
 
@@ -557,6 +555,17 @@ foldlLines fn init buffer =
         0
         (GapBuffer.length buffer.lines)
         buffer.lines
+
+
+foldlSliceLines : (Int -> Line tag ctx -> a -> a) -> a -> Int -> Int -> TextBuffer tag ctx -> a
+foldlSliceLines fn init buffer r1 r2 =
+    -- GapBuffer.foldlSlice
+    --     (\_ line acc -> fn line acc)
+    --     init
+    --     0
+    --     (GapBuffer.length buffer.lines)
+    --     buffer.lines
+    Debug.todo "foldlSliceLines"
 
 
 
