@@ -478,46 +478,50 @@ getLine lineNum buffer =
     GapBuffer.get lineNum buffer.lines
 
 
-getLineAsString : Int -> TextBuffer tag ctx -> String
-getLineAsString lineNum buffer =
-    Debug.todo "getLineAsString"
 
-
-getLineRangeAsString : Int -> Int -> Int -> TextBuffer tag ctx -> String
-getLineRangeAsString lineNum fromCol toCol buffer =
-    Debug.todo "getLineRangeAsString"
+-- getLineAsString : Int -> TextBuffer tag ctx -> String
+-- getLineAsString lineNum buffer =
+--     Debug.todo "getLineAsString"
+--
+--
+-- getLineRangeAsString : Int -> Int -> Int -> TextBuffer tag ctx -> String
+-- getLineRangeAsString lineNum fromCol toCol buffer =
+--     Debug.todo "getLineRangeAsString"
 
 
 getRegionAsString : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> String
 getRegionAsString r1 c1 r2 c2 buffer =
-    -- Old algorithm - looks innefficent.
-    -- Use an indexed foldl over the buffer instead.
-    --     let
-    --         numberOfLines =
-    --             r2 - r1 + 1
-    --     in
-    --     buffer
-    --         |> toList
-    --         |> List.drop r1
-    --         |> List.take numberOfLines
-    --         |> List.indexedMap
-    --             (\i line ->
-    --                 if numberOfLines == 1 then
-    --                     line
-    --                         |> String.dropLeft c1
-    --                         |> String.left (c2 - c1 + 1)
-    --
-    --                 else if i == 0 then
-    --                     String.dropLeft c1 line
-    --
-    --                 else if i == numberOfLines - 1 then
-    --                     String.left (c2 + 1) line
-    --
-    --                 else
-    --                     line
-    --             )
-    --         |> String.join "\n"
-    Debug.todo "getRegionAsString"
+    let
+        numberOfLines =
+            r2 - r1 + 1
+
+        extractLine i line =
+            if numberOfLines == 1 then
+                line
+                    |> String.dropLeft c1
+                    |> String.left (c2 - c1 + 1)
+
+            else if i == r1 then
+                String.dropLeft c1 line
+
+            else if i == r1 + numberOfLines - 1 then
+                String.left (c2 + 1) line
+
+            else
+                line
+    in
+    foldlSliceLines
+        (\i line accum ->
+            if i == r1 then
+                accum ++ extractLine i (lineToString line)
+
+            else
+                accum ++ "\n" ++ extractLine i (lineToString line)
+        )
+        ""
+        r1
+        r2
+        buffer
 
 
 deleteRegion : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> TextBuffer tax ctx
