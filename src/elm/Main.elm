@@ -270,10 +270,14 @@ update msg model =
                     Debug.log "Copy" evt
 
                 copiedText =
-                    -- Int -> Int -> Int -> Int -> TextBuffer tax ctx -> Maybe (List (Line tag ctx))
-                    TextBuffer.getRegion
+                    TextBuffer.getRegionAsString
+                        region.start.row
+                        region.start.col
+                        region.end.row
+                        region.end.col
+                        model.buffer
             in
-            ( model, Ports.Clipboard.toClipboard "hello" )
+            ( model, Ports.Clipboard.toClipboard copiedText )
 
         ( _, Paste evt ) ->
             let

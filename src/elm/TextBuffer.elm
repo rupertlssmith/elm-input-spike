@@ -3,7 +3,7 @@ module TextBuffer exposing
     , breakLine, deleteCharAt, deleteCharBefore, insertCharAt
     , getLine
     , lastColumn, lastLine
-    , Line, TagLineFn, deleteRegion, getRegion, insertStringAt, length, refocus, rippleTo
+    , Line, TagLineFn, deleteRegion, getRegionAsString, insertStringAt, length, refocus, rippleTo
     )
 
 {-| An editing buffer.
@@ -163,6 +163,15 @@ untagLine line =
         |> GapBuffer.fromList identity (always identity)
 
 
+lineToString : Line tag ctx -> String
+lineToString line =
+    List.foldr
+        (\( _, str ) accum -> str :: accum)
+        []
+        line.tagged
+        |> String.concat
+
+
 
 -- Rippling
 
@@ -269,7 +278,7 @@ insertCharAt char row col buffer =
 
 insertStringAt : Char -> Int -> Int -> TextBuffer tag ctx -> TextBuffer tag ctx
 insertStringAt char row col buffer =
-    buffer
+    Debug.todo "insertStringAt"
 
 
 deleteCharBefore : Int -> Int -> TextBuffer tag ctx -> TextBuffer tag ctx
@@ -498,14 +507,24 @@ getLine lineNum buffer =
     GapBuffer.get lineNum buffer.lines
 
 
-getRegion : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> Maybe (List (Line tag ctx))
-getRegion fromRow fromCol toRow toCol buffer =
-    Nothing
+getLineAsString : Int -> TextBuffer tag ctx -> String
+getLineAsString lineNum buffer =
+    Debug.todo "getLineAsString"
+
+
+getLineRangeAsString : Int -> Int -> Int -> TextBuffer tag ctx -> String
+getLineRangeAsString lineNum fromCol toCol buffer =
+    Debug.todo "getLineRangeAsString"
+
+
+getRegionAsString : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> String
+getRegionAsString fromRow fromCol toRow toCol buffer =
+    Debug.todo "getRegionAsString"
 
 
 deleteRegion : Int -> Int -> Int -> Int -> TextBuffer tax ctx -> TextBuffer tax ctx
 deleteRegion fromRow fromCol toRow toCol buffer =
-    buffer
+    Debug.todo "deleteRegion"
 
 
 lineLength : Int -> TextBuffer tag ctx -> Int
