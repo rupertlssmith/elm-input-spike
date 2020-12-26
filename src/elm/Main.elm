@@ -268,6 +268,10 @@ update msg model =
             let
                 _ =
                     Debug.log "Copy" evt
+
+                copiedText =
+                    -- Int -> Int -> Int -> Int -> TextBuffer tax ctx -> Maybe (List (Line tag ctx))
+                    TextBuffer.getRegion
             in
             ( model, Ports.Clipboard.toClipboard "hello" )
 

@@ -204,7 +204,7 @@ let setSelection = (node, selection) => {
 
     anchorOffset = selection.anchorOffset;
     anchorNode = findNodeFromPath(selection.anchorNode, node);
-    console.log(anchorNode);
+    //console.log(anchorNode);
   }
 
   if (focusNode && anchorNode) {

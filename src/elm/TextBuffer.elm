@@ -3,7 +3,7 @@ module TextBuffer exposing
     , breakLine, deleteCharAt, deleteCharBefore, insertCharAt
     , getLine
     , lastColumn, lastLine
-    , Line, TagLineFn, length, refocus, rippleTo
+    , Line, TagLineFn, deleteRegion, getRegion, insertStringAt, length, refocus, rippleTo
     )
 
 {-| An editing buffer.
