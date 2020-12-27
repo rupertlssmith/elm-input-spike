@@ -271,10 +271,10 @@ update msg model =
 
                 copiedText =
                     TextBuffer.getRegionAsString
-                        region.start.row
-                        region.start.col
-                        region.end.row
-                        region.end.col
+                        region.selectionStart.row
+                        region.selectionStart.col
+                        region.selectionEnd.row
+                        region.selectionEnd.col
                         model.buffer
             in
             ( model, Ports.Clipboard.toClipboard copiedText )
